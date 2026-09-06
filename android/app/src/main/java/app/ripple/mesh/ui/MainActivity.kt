@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.ripple.mesh.R
 import app.ripple.mesh.ui.screens.ChatScreen
+import app.ripple.mesh.ui.screens.DiagnosticsScreen
 import app.ripple.mesh.ui.screens.HomeScreen
 import app.ripple.mesh.ui.screens.PowerScreen
 import app.ripple.mesh.ui.screens.SettingsScreen
@@ -93,10 +94,17 @@ fun RippleRoot(vm: MeshViewModel, launchIntent: Intent?) {
             ChatScreen(vm, conversation = it.arguments!!.getString("conversation")!!, onBack = { nav.popBackStack() })
         }
         composable("settings") {
-            SettingsScreen(vm, onBack = { nav.popBackStack() }, onOpenSos = { nav.navigate("sos") }, onOpenPower = { nav.navigate("power") })
+            SettingsScreen(
+                vm,
+                onBack = { nav.popBackStack() },
+                onOpenSos = { nav.navigate("sos") },
+                onOpenPower = { nav.navigate("power") },
+                onOpenDiagnostics = { nav.navigate("diagnostics") },
+            )
         }
         composable("sos") { SosScreen(vm, onBack = { nav.popBackStack() }) }
         composable("power") { PowerScreen(vm, onBack = { nav.popBackStack() }) }
+        composable("diagnostics") { DiagnosticsScreen(vm, onBack = { nav.popBackStack() }) }
     }
 }
 

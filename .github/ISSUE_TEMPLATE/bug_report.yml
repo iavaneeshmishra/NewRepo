@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in the app is wrong (crash, UI, persistence, notifications)
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Android, iOS, Both, Protocol reference (Node)]
+    validations: { required: true }
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS version
+      placeholder: Pixel 7, Android 14
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      placeholder: commit hash or build number
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Enable simulated neighbourhood
+        2. Send Asha a direct message
+        3. …
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How were you running it?
+      options: [Simulated neighbourhood (one phone), Real Bluetooth with other phones, Unit tests / simulator]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics export or crash log
+      render: text

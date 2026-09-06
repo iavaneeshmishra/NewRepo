@@ -32,6 +32,9 @@ struct SettingsView: View {
                     NavigationLink { PowerView() } label: {
                         Label("Power profile", systemImage: "battery.75")
                     }
+                    NavigationLink { DiagnosticsView() } label: {
+                        Label("Diagnostics", systemImage: "waveform.path.ecg")
+                    }
                 }
                 Section {
                     Text("Ripple never uses the internet. Messages hop phone-to-phone over Bluetooth LE, are signed by the sender, and direct messages are end-to-end encrypted. Messages for peers who are out of range are held and delivered when the mesh reconnects.")

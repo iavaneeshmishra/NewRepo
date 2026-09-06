@@ -21,4 +21,4 @@ rm -rf "$OUT" && mkdir -p "$OUT"
 cp "$ROOT/protocol/test-vectors.json" "$OUT/test-vectors.json"
 STDLIB="$(dirname "$(command -v "$KOTLINC")")/../lib/kotlin-stdlib.jar"
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -cp "$OUT:$STDLIB" conformance.RunnerKt \
-  app.ripple.mesh.core.ProtocolVectorsTest app.ripple.mesh.core.MeshRouterTest
+  app.ripple.mesh.core.ProtocolVectorsTest app.ripple.mesh.core.MeshRouterTest app.ripple.mesh.core.LoopbackTest

@@ -1,5 +1,6 @@
 package app.ripple.mesh.ble
 
+import app.ripple.mesh.core.EventLog
 import app.ripple.mesh.core.Fragmenter
 import app.ripple.mesh.core.Link
 import app.ripple.mesh.core.Reassembler
@@ -20,6 +21,16 @@ abstract class BleLink(override val id: String, private val onPacket: (BleLink, 
     /** Negotiated frame size (mtu - 3, capped at 512). Updated by the subclass. */
     @Volatile var frameSize: Int = 20
 
+    // Diagnostics
+    val openedAt: Long = System.currentTimeMillis()
+    @Volatile var bytesIn: Long = 0; private set
+    @Volatile var bytesOut: Long = 0; private set
+    @Volatile var packetsIn: Int = 0; private set
+    @Volatile var packetsOut: Int = 0; private set
+    @Volatile var rssi: Int? = null
+    @Volatile var lastActivity: Long = openedAt; private set
+    protected val log = EventLog.global
+
     private val reassembler = Reassembler()
     private val outbound = LinkedBlockingQueue<ByteArray>()
     private val closed = AtomicBoolean(false)
@@ -33,7 +44,9 @@ abstract class BleLink(override val id: String, private val onPacket: (BleLink, 
 
     /** Called by the subclass for every frame received from the radio. */
     protected fun onFrame(frame: ByteArray) {
+        bytesIn += frame.size; lastActivity = System.currentTimeMillis()
         val packet = synchronized(reassembler) { reassembler.push(frame) } ?: return
+        packetsIn++
         onPacket(this, packet)
     }
 
@@ -44,8 +57,10 @@ abstract class BleLink(override val id: String, private val onPacket: (BleLink, 
                 val streamId = Random.nextInt(0, 0x10000)
                 for (frame in Fragmenter.fragment(packet, frameSize, streamId)) {
                     if (closed.get()) return
-                    if (!writeFrame(frame)) { close(); return }
+                    if (!writeFrame(frame)) { log.w("link", "$id write failed; closing"); close(); return }
+                    bytesOut += frame.size; lastActivity = System.currentTimeMillis()
                 }
+                packetsOut++
             }
         } catch (_: InterruptedException) { }
     }
