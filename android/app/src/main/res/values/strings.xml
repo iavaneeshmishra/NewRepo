@@ -36,5 +36,16 @@
     <string name="save">Save</string>
     <string name="mesh_status">Mesh status</string>
     <string name="status_detail">Bluetooth %1$s · %2$d direct links · %3$d peers known</string>
+    <string name="diagnostics">Diagnostics</string>
+    <string name="clear_log">Clear log</string>
+    <string name="share_log">Share diagnostics</string>
+    <string name="diag_bluetooth">Bluetooth</string>
+    <string name="diag_advertising">Advertising</string>
+    <string name="diag_links">Links</string>
+    <string name="diag_peers">Peers known</string>
+    <string name="diag_events">Event log (%d)</string>
+    <string name="loopback_title">Simulated neighbourhood</string>
+    <string name="loopback_hint">Adds two fake peers (Asha, Ravi) so you can try the app with one phone. Ravi is two hops away and wanders out of range.</string>
+    <string name="peers_empty_cta">Only one phone? Try the simulated neighbourhood in Settings → Diagnostics</string>
     <string name="about_blurb">Ripple never uses the internet. Messages hop phone-to-phone over Bluetooth LE, are signed by the sender, and direct messages are end-to-end encrypted. Messages for peers who are out of range are held and delivered when the mesh reconnects.</string>
 </resources>

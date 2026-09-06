@@ -30,6 +30,8 @@ import app.ripple.mesh.core.Packet
 import app.ripple.mesh.core.Peer
 import app.ripple.mesh.core.RouterListener
 import app.ripple.mesh.core.Crypto
+import app.ripple.mesh.core.EventLog
+import app.ripple.mesh.core.Loopback
 import app.ripple.mesh.core.toHex
 import app.ripple.mesh.data.IdentityStore
 import app.ripple.mesh.data.MessageEntity
@@ -53,6 +55,23 @@ data class MeshStatus(
     val advertising: Boolean = false,
     val directLinks: Int = 0,
     val knownPeers: Int = 0,
+    val loopback: Boolean = false,
+)
+
+/** Snapshot of one link for the Diagnostics screen. */
+data class LinkInfo(
+    val id: String,
+    val role: String,            // "central" (we connected out) / "peripheral" (they connected in) / "sim"
+    val peerName: String?,
+    val peerShort: String?,
+    val rssi: Int?,
+    val frameSize: Int,
+    val bytesIn: Long,
+    val bytesOut: Long,
+    val packetsIn: Int,
+    val packetsOut: Int,
+    val ageMs: Long,
+    val idleMs: Long,
 )
 
 /**
@@ -81,6 +100,8 @@ class MeshService : LifecycleService(), RouterListener {
     private lateinit var db: RippleDatabase
     private var central: BleCentral? = null
     private var peripheral: BlePeripheral? = null
+    private var loopback: Loopback? = null
+    val eventLog: EventLog get() = EventLog.global
     private val adapter: BluetoothAdapter? by lazy { (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter }
 
     private val _status = MutableStateFlow(MeshStatus())
@@ -100,6 +121,7 @@ class MeshService : LifecycleService(), RouterListener {
         val identity = IdentityStore.load(this)
         router = MeshRouter(identity, "Ripple ${identity.nodeId.short}", this)
         Log.i(TAG, "identity ${identity.nodeId.display}")
+        eventLog.i("service", "started; node ${identity.nodeId.display}; Android ${Build.VERSION.SDK_INT}; ${Build.MANUFACTURER} ${Build.MODEL}")
 
         lifecycleScope.launch {
             IdentityStore.displayName(this@MeshService).first()?.let { router.setDisplayName(it) }
@@ -124,6 +146,7 @@ class MeshService : LifecycleService(), RouterListener {
                 delay(30_000)
                 persistRelayStore()
                 central?.startScanning()
+                central?.refreshRssi()
                 updateNotification()
             }
         }
@@ -140,8 +163,9 @@ class MeshService : LifecycleService(), RouterListener {
 
     private fun startBle() {
         val ad = adapter ?: return
-        if (!ad.isEnabled) { _status.update { it.copy(bluetoothOn = false) }; return }
+        if (!ad.isEnabled) { _status.update { it.copy(bluetoothOn = false) }; eventLog.w("service", "Bluetooth is off"); return }
         if (central != null) return
+        eventLog.i("service", "Bluetooth on; starting central + peripheral roles")
         val p = BlePeripheral(this, ad, ::onPacket, ::onLinkReady, ::onLinkClosed)
         val c = BleCentral(this, ad, ::onPacket, ::onLinkReady, ::onLinkClosed)
         c.shouldSkip = { device -> p.connectedAddresses().contains(device.address) }
@@ -192,6 +216,38 @@ class MeshService : LifecycleService(), RouterListener {
     }
 
     override fun onLinkIdentified(link: Link, peer: Peer) = refreshLinkStatus()
+
+    // ---- Diagnostics ----------------------------------------------------------------
+
+    fun linkInfos(): List<LinkInfo> {
+        val now = System.currentTimeMillis()
+        fun info(l: BleLink, role: String): LinkInfo {
+            val peer = l.peerHex?.let { router.peer(NodeId.fromHex(it)) }
+            return LinkInfo(l.id, role, peer?.name, l.peerHex?.takeLast(4), l.rssi, l.frameSize, l.bytesIn, l.bytesOut, l.packetsIn, l.packetsOut, now - l.openedAt, now - l.lastActivity)
+        }
+        val ble = (central?.links()?.map { info(it, "central") } ?: emptyList()) + (peripheral?.links()?.map { info(it, "peripheral") } ?: emptyList())
+        val sim = if (loopback?.isRunning == true) router.linkSnapshots().filter { it.first.startsWith("sim:") }.map { (id, peerHex) ->
+            val peer = peerHex?.let { router.peer(NodeId.fromHex(it)) }
+            LinkInfo(id, "sim", peer?.name, peerHex?.takeLast(4), null, 0, 0, 0, 0, 0, 0, 0)
+        } else emptyList()
+        return ble + sim
+    }
+
+    fun setLoopback(enabled: Boolean) {
+        if (enabled && loopback == null) { loopback = Loopback(router).also { it.start() } }
+        else if (!enabled) { loopback?.stop(); loopback = null }
+        _status.update { it.copy(loopback = enabled, directLinks = router.directNeighbourCount()) }
+    }
+
+    fun diagnosticsHeader(): String = buildString {
+        appendLine("Ripple diagnostics")
+        appendLine("node: ${router.selfId.display}  name: ${router.displayName}")
+        appendLine("device: ${Build.MANUFACTURER} ${Build.MODEL}  Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+        appendLine("bluetooth: ${if (_status.value.bluetoothOn) "on" else "off"}  advertising: ${peripheral?.isAdvertising ?: false}  loopback: ${loopback?.isRunning ?: false}")
+        appendLine("links: ${router.linkCount()}  identified: ${router.directNeighbourCount()}  peers known: ${router.peers().size}  relay store: ${router.relayStoreSnapshot().size}")
+        for (l in linkInfos()) appendLine("  ${l.id} [${l.role}] peer=${l.peerName ?: l.peerShort ?: "?"} rssi=${l.rssi ?: "?"} frame=${l.frameSize} in=${l.packetsIn}p/${l.bytesIn}B out=${l.packetsOut}p/${l.bytesOut}B")
+        for (p in router.peers()) appendLine("  peer ${p.name} (${p.nodeId.short}) hops=${p.hops} seen=${EventLog.formatTime(p.lastSeen)}")
+    }
 
     // ---- API for the UI -------------------------------------------------------------
 
@@ -265,6 +321,7 @@ class MeshService : LifecycleService(), RouterListener {
 
     override fun onDestroy() {
         unregisterReceiver(btStateReceiver)
+        loopback?.stop()
         stopBle()
         super.onDestroy()
     }

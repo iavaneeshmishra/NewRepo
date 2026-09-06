@@ -1,0 +1,32 @@
+name: Protocol change proposal
+description: Propose a change to PROTOCOL.md (wire format, crypto, routing)
+title: "protocol: "
+labels: ["protocol"]
+body:
+  - type: markdown
+    attributes:
+      value: Please read docs/PROTOCOL_VERSIONING.md first. Header changes partition the mesh; prefer new packet types or payload extensions.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can't be done today, or what is unsafe?
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Byte-level if possible. Say whether it is compatible or requires a version bump.
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: impl
+    attributes:
+      label: Implementation plan
+      options:
+        - label: I can implement it in the Node reference
+        - label: I can implement it in Kotlin
+        - label: I can implement it in Swift

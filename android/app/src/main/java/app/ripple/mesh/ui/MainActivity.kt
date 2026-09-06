@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.ripple.mesh.R
 import app.ripple.mesh.ui.screens.ChatScreen
+import app.ripple.mesh.ui.screens.DiagnosticsScreen
 import app.ripple.mesh.ui.screens.HomeScreen
 import app.ripple.mesh.ui.screens.SettingsScreen
 
@@ -89,7 +90,8 @@ fun RippleRoot(vm: MeshViewModel, launchIntent: Intent?) {
         composable("chat/{conversation}", arguments = listOf(navArgument("conversation") { type = NavType.StringType })) {
             ChatScreen(vm, conversation = it.arguments!!.getString("conversation")!!, onBack = { nav.popBackStack() })
         }
-        composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
+        composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }, onOpenDiagnostics = { nav.navigate("diagnostics") }) }
+        composable("diagnostics") { DiagnosticsScreen(vm, onBack = { nav.popBackStack() }) }
     }
 }
 

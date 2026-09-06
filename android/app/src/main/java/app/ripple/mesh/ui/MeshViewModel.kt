@@ -14,6 +14,7 @@ import app.ripple.mesh.data.IdentityStore
 import app.ripple.mesh.data.MessageEntity
 import app.ripple.mesh.data.PeerEntity
 import app.ripple.mesh.data.RippleDatabase
+import app.ripple.mesh.service.LinkInfo
 import app.ripple.mesh.service.MeshService
 import app.ripple.mesh.service.MeshStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -71,6 +72,11 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setDisplayName(name: String) = viewModelScope.launch { service.value?.setDisplayName(name) ?: IdentityStore.setDisplayName(getApplication(), name) }
+
+    // Diagnostics
+    fun linkInfos(): List<LinkInfo> = service.value?.linkInfos() ?: emptyList()
+    fun diagnosticsHeader(): String = service.value?.diagnosticsHeader() ?: "Ripple diagnostics (service not bound)"
+    fun setLoopback(enabled: Boolean) { service.value?.setLoopback(enabled) }
 
     override fun onCleared() {
         runCatching { getApplication<Application>().unbindService(connection) }

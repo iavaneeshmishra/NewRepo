@@ -13,6 +13,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,7 +34,7 @@ import app.ripple.mesh.ui.MeshViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: MeshViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: MeshViewModel, onBack: () -> Unit, onOpenDiagnostics: () -> Unit) {
     val selfId by vm.selfId.collectAsStateWithLifecycle()
     val savedName by vm.displayName.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
@@ -60,6 +61,7 @@ fun SettingsScreen(vm: MeshViewModel, onBack: () -> Unit) {
 
             Text(stringResource(R.string.mesh_status), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.status_detail, if (status.bluetoothOn) "on" else "off", status.directLinks, status.knownPeers))
+            OutlinedButton(onClick = onOpenDiagnostics) { Text(stringResource(R.string.diagnostics)) }
             Text(stringResource(R.string.about_blurb), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

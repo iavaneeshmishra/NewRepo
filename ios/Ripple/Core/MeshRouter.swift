@@ -60,6 +60,7 @@ final class MeshRouter {
     }
 
     private let queue = DispatchQueue(label: "app.ripple.mesh.router")
+    private let log = EventLog.global
     private static let queueKey = DispatchSpecificKey<Void>()
 
     /// `queue.sync` that tolerates re-entrancy (e.g. a link closed from inside the
@@ -86,6 +87,7 @@ final class MeshRouter {
     func allPeers() -> [Peer] { locked { Array(peers.values) } }
     func peer(_ id: NodeId) -> Peer? { locked { peers[id.hex] } }
     func linkCount() -> Int { locked { links.count } }
+    func linkSnapshots() -> [(id: String, peerHex: String?)] { locked { linkOrder.compactMap { id in links[id].map { ($0.id, $0.peerHex) } } } }
     func directNeighbourCount() -> Int { locked { links.values.filter { $0.peerHex != nil }.count } }
 
     func setDisplayName(_ name: String) {
@@ -132,6 +134,7 @@ final class MeshRouter {
     }
 
     private func originateLocked(_ packet: Packet) -> Data {
+        if packet.type != .ack { log.i("router", "sending \(packet.type) \(packet.messageIdHex.prefix(8)) on \(links.count) link(s)") }
         markSeen(packet, at: now())
         store(packet, from: nil)
         broadcast(packet, except: nil)
@@ -157,11 +160,14 @@ final class MeshRouter {
 
     private func onLinkIdentified(_ link: Link, peerHex: String) {
         let duplicate = links.values.contains { $0 !== link && $0.peerHex == peerHex }
-        if duplicate && selfId.hex > peerHex { link.close(); removeLink(link.id); return }
+        if duplicate && selfId.hex > peerHex { log.d("router", "closing duplicate link \(link.id) to \(peerHex.suffix(4))"); link.close(); removeLink(link.id); return }
+        log.i("router", "link \(link.id) is \(peers[peerHex]?.name ?? String(peerHex.suffix(4)))")
 
         if let p = peers[peerHex] { listener?.router(self, didIdentify: link, as: p) }
 
         let t = now()
+        var replayed = 0
+        defer { if replayed > 0 { log.i("router", "replayed \(replayed) stored packet(s) to \(peerHex.suffix(4))") } }
         for key in relayOrder {
             guard let entry = relayStore[key], entry.expiresAt > t, !entry.deliveredTo.contains(peerHex) else { continue }
             let dest = entry.packet.destination
@@ -170,6 +176,7 @@ final class MeshRouter {
             if forPeer || dest.isBroadcast || unknownDest {
                 entry.deliveredTo.insert(peerHex)
                 link.send(entry.packet.encode())
+                replayed += 1
             }
         }
     }
@@ -194,20 +201,21 @@ final class MeshRouter {
         if forMe || isBroadcast {
             let peer = peers[p.source.hex]
             let verified = peer.map { Crypto.verify($0.publicKey, unsignedPacket: p.encodeUnsigned(), rawSignature: p.signature) } ?? false
-            if peer != nil && !verified { return }
-            if forMe && peer == nil { relay(p, from: link); return }
+            if peer != nil && !verified { log.w("router", "dropped \(p.type) \(p.messageIdHex.prefix(8)): bad signature for \(p.source.short)"); return }
+            if forMe && peer == nil { log.d("router", "\(p.type) \(p.messageIdHex.prefix(8)) for me from unknown \(p.source.short); relaying"); relay(p, from: link); return }
 
             switch p.type {
             case .message:
                 let text: String
                 if p.isEncrypted {
                     guard let plain = try? Crypto.decrypt(recipient: identity.agreement, messageId: p.messageId, source: p.source, destination: p.destination, payload: p.payload),
-                          let s = String(data: plain, encoding: .utf8) else { return }
+                          let s = String(data: plain, encoding: .utf8) else { log.w("router", "could not decrypt \(p.messageIdHex.prefix(8)) from \(p.source.short)"); return }
                     text = s
                 } else {
                     guard let s = String(data: p.payload, encoding: .utf8) else { return }
                     text = s
                 }
+                log.i("router", "\(isBroadcast ? "broadcast" : "direct") \(p.messageIdHex.prefix(8)) from \(peer?.name ?? p.source.short) via \(link.id) (ttl \(p.ttl))")
                 listener?.router(self, didReceive: InboundMessage(messageId: p.messageId, from: p.source, fromName: peer?.name, text: text, isBroadcast: isBroadcast, verified: verified, timestamp: p.timestamp))
                 if forMe, let ack = try? PacketFactory.ack(identity, to: p.source, acknowledged: p.messageId) { _ = originateLocked(ack) }
             case .ack:
@@ -228,6 +236,7 @@ final class MeshRouter {
 
         let hops = Int(MeshProtocol.maxTTL) - Int(p.ttl) + 1
         let prev = peers[p.source.hex]
+        if prev == nil { log.i("router", "new peer \(ann.name) (\(p.source.short)) at \(hops) hop(s)") }
         peers[p.source.hex] = Peer(nodeId: p.source, publicKey: key, publicKeyWire: ann.publicKeyWire, name: ann.name, lastSeen: t, hops: prev.map { min($0.hops, hops) } ?? hops)
         listener?.router(self, peersDidChange: Array(peers.values))
 
