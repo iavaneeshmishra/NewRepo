@@ -65,7 +65,7 @@ jobs:
 
   ios:
     name: iOS unit tests
-    runs-on: macos-14
+    runs-on: macos-15
     needs: protocol
     steps:
       - uses: actions/checkout@v4
