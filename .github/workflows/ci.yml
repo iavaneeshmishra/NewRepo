@@ -5,6 +5,10 @@ on:
     branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   protocol:
     name: Protocol reference + vectors
@@ -32,8 +36,25 @@ jobs:
           if [ ! -f gradlew ]; then
             gradle wrapper --gradle-version 8.9 --no-daemon
           fi
-      - run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
+      - name: Build and test
         working-directory: android
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest assembleDebug --no-daemon --console=plain 2>&1 | tee gradle.log
+      - name: Summarize errors
+        if: always()
+        working-directory: android
+        run: |
+          {
+            echo "### Android build errors"
+            echo '```'
+            grep -E "^e: |error:|FAILED|Test.*FAILED|tests completed|BUILD " gradle.log | sed 's#/home/runner/work/NewRepo/NewRepo/##' | sort -u | head -80
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > android-errors.md
+      - name: Comment errors on PR
+        if: failure() && github.event_name == 'pull_request'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file android/android-errors.md
       - uses: actions/upload-artifact@v4
         with:
           name: ripple-debug-apk
@@ -66,9 +87,23 @@ jobs:
           xcodebuild test -scheme Ripple -project Ripple.xcodeproj \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
-            -resultBundlePath TestResults.xcresult 2>&1 | tee xcodebuild.log | grep -E "error:|warning: |Test Case|Test Suite|Executed|BUILD|TEST" || true
+            -resultBundlePath TestResults.xcresult 2>&1 | tee xcodebuild.log | grep -E "error:|Test Case|Test Suite|Executed|BUILD|TEST" || true
           test ${PIPESTATUS[0]} -eq 0
           grep -q "Test Suite 'All tests' passed" xcodebuild.log
+      - name: Summarize errors
+        if: always()
+        working-directory: ios
+        run: |
+          {
+            echo "### iOS build errors"
+            echo '```'
+            grep -E "error:|Executed|Test Suite 'All tests'|\*\* (BUILD|TEST) " xcodebuild.log | sed 's#/Users/runner/work/NewRepo/NewRepo/##' | sort -u | head -80
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > ios-errors.md
+      - name: Comment errors on PR
+        if: failure() && github.event_name == 'pull_request'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file ios/ios-errors.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:
