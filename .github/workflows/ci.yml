@@ -18,8 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: node tools/protocol/test.js
-      - name: Vectors are up to date
-        run: node tools/protocol/gen-vectors.js && git diff --exit-code protocol/test-vectors.json
+      - name: Vectors are up to date (and copies in both apps match)
+        run: |
+          node tools/protocol/gen-vectors.js && git diff --exit-code protocol/test-vectors.json
+          cmp protocol/test-vectors.json android/app/src/test/resources/test-vectors.json
+          cmp protocol/test-vectors.json ios/RippleTests/Resources/test-vectors.json
 
   android:
     name: Android unit tests + debug build
@@ -67,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
-      - run: xcodegen generate
+      - run: xcodegen generate && ls Ripple.xcodeproj
         working-directory: ios
       - name: Pick a simulator
         id: sim

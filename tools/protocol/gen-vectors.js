@@ -118,5 +118,12 @@ vectors.invalid = {
 };
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, JSON.stringify(vectors, null, 2) + '\n');
-console.log('wrote', path.relative(process.cwd(), outPath));
+const json = JSON.stringify(vectors, null, 2) + '\n';
+fs.writeFileSync(outPath, json);
+// Both apps carry a copy inside their test bundles; keep them in lock-step.
+for (const copy of ['android/app/src/test/resources/test-vectors.json', 'ios/RippleTests/Resources/test-vectors.json']) {
+  const p = path.join(__dirname, '..', '..', copy);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, json);
+}
+console.log('wrote', path.relative(process.cwd(), outPath), '(+2 copies)');
