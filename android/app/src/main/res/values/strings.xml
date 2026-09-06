@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ripple</string>
+    <string name="channel_status">Mesh status</string>
+    <string name="channel_messages">Messages</string>
+
+    <string name="permission_rationale">Ripple talks to nearby phones directly over Bluetooth — no internet, no servers. It needs permission to scan for, advertise to and connect with nearby devices.</string>
+    <string name="permission_grant">Allow Bluetooth</string>
+
+    <string name="status_starting">Starting mesh…</string>
+    <string name="status_bt_off">Bluetooth is off</string>
+    <plurals name="status_links">
+        <item quantity="one">%1$d direct link · %2$d peers known</item>
+        <item quantity="other">%1$d direct links · %2$d peers known</item>
+    </plurals>
+    <plurals name="hops">
+        <item quantity="one">%d hop</item>
+        <item quantity="other">%d hops</item>
+    </plurals>
+
+    <string name="tab_chats">Chats</string>
+    <string name="tab_peers">Peers (%d)</string>
+    <string name="broadcast_channel">Everyone nearby</string>
+    <string name="broadcast_hint">Public channel — reaches every phone in the mesh</string>
+    <string name="broadcast_subtitle">Public · signed · up to 7 hops</string>
+    <string name="direct_subtitle">End-to-end encrypted · relayed by the mesh</string>
+    <string name="peers_empty">No peers yet. Keep Bluetooth on and bring another phone running Ripple within range.</string>
+    <string name="message_hint">Message</string>
+    <string name="send">Send</string>
+    <string name="unverified">unverified</string>
+
+    <string name="settings">Settings</string>
+    <string name="your_identity">Your node ID</string>
+    <string name="identity_hint">Derived from a P-256 key generated on this device. Share it out-of-band to let others verify it\'s you.</string>
+    <string name="display_name">Display name</string>
+    <string name="save">Save</string>
+    <string name="mesh_status">Mesh status</string>
+    <string name="status_detail">Bluetooth %1$s · %2$d direct links · %3$d peers known</string>
+    <string name="about_blurb">Ripple never uses the internet. Messages hop phone-to-phone over Bluetooth LE, are signed by the sender, and direct messages are end-to-end encrypted. Messages for peers who are out of range are held and delivered when the mesh reconnects.</string>
+</resources>
