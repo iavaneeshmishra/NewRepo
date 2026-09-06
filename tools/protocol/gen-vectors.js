@@ -12,6 +12,22 @@ const alice = R.identityFromPrivateScalar('1111111111111111111111111111111111111
 const bob = R.identityFromPrivateScalar('2222222222222222222222222222222222222222222222222222222222222222');
 const EPH = '3333333333333333333333333333333333333333333333333333333333333333';
 
+const outPath = path.join(__dirname, '..', '..', 'protocol', 'test-vectors.json');
+
+// ECDSA signatures are randomized. To keep this generator idempotent (so CI can
+// check the file is current), reuse the previously committed signature whenever
+// the unsigned bytes are unchanged and the old signature still verifies.
+let previous = {};
+try { previous = JSON.parse(fs.readFileSync(outPath, 'utf8')); } catch { /* first run */ }
+function stable(section, packet, identity) {
+  const old = previous[section];
+  if (old && old.unsignedBytes === hex(R.encodeUnsigned(packet))) {
+    const sig = Buffer.from(old.fullPacket.slice(-2 * R.SIGNATURE_SIZE), 'hex');
+    if (R.verify(identity.publicKey, R.encodeUnsigned(packet), sig)) return { ...packet, signature: sig };
+  }
+  return packet;
+}
+
 const vectors = { spec: 'ripple-mesh-v1', notes: 'ECDSA signatures are randomized; verify them rather than comparing bytes.' };
 
 vectors.identities = {
@@ -21,11 +37,11 @@ vectors.identities = {
 
 // --- announce
 const annPayload = R.encodeAnnounce(alice, 'Alice 📱');
-const ann = R.buildPacket(alice, {
+const ann = stable('announce', R.buildPacket(alice, {
   type: R.PacketType.ANNOUNCE, ttl: 7,
   messageId: Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex'),
   timestamp: 1_757_000_000_000n, payload: annPayload,
-});
+}), alice);
 vectors.announce = {
   name: 'Alice 📱',
   payload: hex(annPayload),
@@ -37,11 +53,11 @@ vectors.announce = {
 
 // --- broadcast message
 const bcastPayload = Buffer.from('Hello, mesh! नमस्ते', 'utf8');
-const bcast = R.buildPacket(alice, {
+const bcast = stable('broadcastMessage', R.buildPacket(alice, {
   type: R.PacketType.MESSAGE, ttl: 5,
   messageId: Buffer.from('a0a1a2a3a4a5a6a7a8a9aaabacadaeaf', 'hex'),
   timestamp: 1_757_000_001_000n, payload: bcastPayload,
-});
+}), alice);
 vectors.broadcastMessage = {
   text: 'Hello, mesh! नमस्ते',
   unsignedBytes: hex(R.encodeUnsigned(bcast)),
@@ -58,10 +74,10 @@ const plaintext = Buffer.from('secret: meet at the north gate at 18:30', 'utf8')
 const box = R.eciesEncrypt({ recipientWire: bob.publicKeyWire, messageId: msgId, source: alice.nodeId, destination: bob.nodeId, plaintext, ephemeralScalarHex: EPH, nonce });
 const roundTrip = R.eciesDecrypt({ recipientIdentity: bob, messageId: msgId, source: alice.nodeId, destination: bob.nodeId, payload: box });
 if (!roundTrip.equals(plaintext)) throw new Error('ECIES self-check failed');
-const direct = R.buildPacket(alice, {
+const direct = stable('directMessage', R.buildPacket(alice, {
   type: R.PacketType.MESSAGE, flags: R.Flags.ENCRYPTED, ttl: 7, messageId: msgId, destination: bob.nodeId,
   timestamp: 1_757_000_002_000n, payload: box,
-});
+}), alice);
 // Expose the intermediate values so ports can pinpoint where they diverge.
 const crypto = require('crypto');
 const eph = crypto.createECDH('prime256v1'); eph.setPrivateKey(Buffer.from(EPH, 'hex'));
@@ -80,10 +96,10 @@ vectors.directMessage = {
 };
 
 // --- ack bob -> alice
-const ack = R.buildPacket(bob, {
+const ack = stable('ack', R.buildPacket(bob, {
   type: R.PacketType.ACK, ttl: 7, messageId: Buffer.from('d0d1d2d3d4d5d6d7d8d9dadbdcdddedf', 'hex'),
   destination: alice.nodeId, timestamp: 1_757_000_003_000n, payload: msgId,
-});
+}), bob);
 vectors.ack = { unsignedBytes: hex(R.encodeUnsigned(ack)), fullPacket: hex(R.encode(ack)) };
 
 // --- fragmentation
@@ -101,7 +117,6 @@ vectors.invalid = {
   tamperedPayload: (() => { const b = Buffer.from(R.encode(bcast)); b[R.HEADER_SIZE] ^= 0x01; return hex(b); })(),
 };
 
-const out = path.join(__dirname, '..', '..', 'protocol', 'test-vectors.json');
-fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, JSON.stringify(vectors, null, 2) + '\n');
-console.log('wrote', path.relative(process.cwd(), out));
+fs.mkdirSync(path.dirname(outPath), { recursive: true });
+fs.writeFileSync(outPath, JSON.stringify(vectors, null, 2) + '\n');
+console.log('wrote', path.relative(process.cwd(), outPath));
