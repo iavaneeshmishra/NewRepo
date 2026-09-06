@@ -41,17 +41,20 @@ final class MeshService: ObservableObject, RouterListener {
 
         restoreState()
 
-        central = BleCentral(onPacket: { [weak self] l, b in self?.router.onReceive(l, b) },
-                             onLinkReady: { [weak self] l in self?.linkReady(l) },
-                             onLinkClosed: { [weak self] l in self?.linkClosed(l) })
-        peripheral = BlePeripheral(onPacket: { [weak self] l, b in self?.router.onReceive(l, b) },
-                                   onLinkReady: { [weak self] l in self?.linkReady(l) },
-                                   onLinkClosed: { [weak self] l in self?.linkClosed(l) })
-        central.onStateChange = { [weak self] s in Task { @MainActor in self?.status.bluetoothOn = (s == .poweredOn); self?.refreshStatus() } }
-        peripheral.onStateChange = { [weak self] _ in Task { @MainActor in self?.refreshStatus() } }
+        let r = router
+        central = BleCentral(onPacket: { l, b in r.onReceive(l, b) },
+                             onLinkReady: { [weak self] l in r.onLinkReady(l); self?.scheduleStatusRefresh() },
+                             onLinkClosed: { [weak self] l in r.onLinkClosed(l); self?.scheduleStatusRefresh() })
+        peripheral = BlePeripheral(onPacket: { l, b in r.onReceive(l, b) },
+                                   onLinkReady: { [weak self] l in r.onLinkReady(l); self?.scheduleStatusRefresh() },
+                                   onLinkClosed: { [weak self] l in r.onLinkClosed(l); self?.scheduleStatusRefresh() })
+        central.onStateChange = { [weak self] s in
+            Task { @MainActor [weak self] in self?.status.bluetoothOn = (s == .poweredOn); self?.refreshStatus() }
+        }
+        peripheral.onStateChange = { [weak self] _ in self?.scheduleStatusRefresh() }
 
         housekeeping = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.persistRelayStore(); self?.central.startScanning() }
+            Task { @MainActor [weak self] in self?.persistRelayStore(); self?.central.startScanning() }
         }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
@@ -91,14 +94,8 @@ final class MeshService: ObservableObject, RouterListener {
 
     // MARK: BLE glue
 
-    nonisolated private func linkReady(_ link: BleLink) {
-        router.onLinkReady(link)
-        Task { @MainActor in self.refreshStatus() }
-    }
-
-    nonisolated private func linkClosed(_ link: BleLink) {
-        router.onLinkClosed(link)
-        Task { @MainActor in self.refreshStatus() }
+    nonisolated private func scheduleStatusRefresh() {
+        Task { @MainActor [weak self] in self?.refreshStatus() }
     }
 
     private func refreshStatus() {
@@ -110,7 +107,8 @@ final class MeshService: ObservableObject, RouterListener {
     // MARK: RouterListener (called on the router queue)
 
     nonisolated func router(_ router: MeshRouter, didReceive m: InboundMessage) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             let conversation = m.isBroadcast ? Persistence.broadcastConversation : m.from.hex
             let rec = MessageRecord(messageId: m.messageId.hex, conversation: conversation, fromNodeId: m.from.hex, fromName: m.fromName,
                                     text: m.text, timestamp: Date(timeIntervalSince1970: Double(m.timestamp) / 1000), outgoing: false,
@@ -122,7 +120,8 @@ final class MeshService: ObservableObject, RouterListener {
     }
 
     nonisolated func router(_ router: MeshRouter, didReceiveAck messageId: Data, from: NodeId) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             let id = messageId.hex
             if let rec = try? self.container.mainContext.fetch(FetchDescriptor<MessageRecord>(predicate: #Predicate { $0.messageId == id })).first {
                 rec.status = .delivered
@@ -132,7 +131,8 @@ final class MeshService: ObservableObject, RouterListener {
     }
 
     nonisolated func router(_ router: MeshRouter, peersDidChange peers: [Peer]) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             let ctx = self.container.mainContext
             for p in peers {
                 let id = p.nodeId.hex
@@ -148,7 +148,7 @@ final class MeshService: ObservableObject, RouterListener {
     }
 
     nonisolated func router(_ router: MeshRouter, didIdentify link: Link, as peer: Peer) {
-        Task { @MainActor in self.refreshStatus() }
+        scheduleStatusRefresh()
     }
 
     // MARK: API for the UI

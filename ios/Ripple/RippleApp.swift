@@ -10,8 +10,8 @@ struct RippleApp: App {
 
     init() {
         let c = Persistence.container()
-        container = c
-        _mesh = StateObject(wrappedValue: MeshService(container: c))
+        self.container = c
+        self._mesh = StateObject(wrappedValue: MeshService(container: c))
     }
 
     var body: some Scene {
