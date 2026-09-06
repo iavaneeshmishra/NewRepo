@@ -225,6 +225,7 @@ class MeshRouter(
                 }
                 PacketType.ACK -> if (forMe && p.payload.size == Protocol.MESSAGE_ID_SIZE) listener.onAck(p.payload, p.source)
                 PacketType.ANNOUNCE -> {}
+                PacketType.SOS -> {} // handled above
             }
         }
         if (!forMe) relay(p, link)
