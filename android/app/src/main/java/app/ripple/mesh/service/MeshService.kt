@@ -11,6 +11,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -22,6 +24,8 @@ import app.ripple.mesh.R
 import app.ripple.mesh.ble.BleCentral
 import app.ripple.mesh.ble.BleLink
 import app.ripple.mesh.ble.BlePeripheral
+import app.ripple.mesh.core.BatteryProfile
+import app.ripple.mesh.core.Crypto
 import app.ripple.mesh.core.InboundMessage
 import app.ripple.mesh.core.Link
 import app.ripple.mesh.core.MeshRouter
@@ -29,7 +33,8 @@ import app.ripple.mesh.core.NodeId
 import app.ripple.mesh.core.Packet
 import app.ripple.mesh.core.Peer
 import app.ripple.mesh.core.RouterListener
-import app.ripple.mesh.core.Crypto
+import app.ripple.mesh.core.SosBeacon
+import app.ripple.mesh.core.SosLocation
 import app.ripple.mesh.core.toHex
 import app.ripple.mesh.data.IdentityStore
 import app.ripple.mesh.data.MessageEntity
@@ -85,6 +90,12 @@ class MeshService : LifecycleService(), RouterListener {
 
     private val _status = MutableStateFlow(MeshStatus())
     val status: StateFlow<MeshStatus> = _status
+
+    private val _powerProfile = MutableStateFlow(BatteryProfile.BALANCED)
+    val powerProfile: StateFlow<Int> = _powerProfile
+
+    /** Most recently received SOS beacon (drives the SOS screen + notification). */
+    @Volatile var recentSos: SosBeacon? = null
 
     /** Conversation currently on screen; used to suppress its notifications. */
     @Volatile var visibleConversation: String? = null
@@ -193,7 +204,44 @@ class MeshService : LifecycleService(), RouterListener {
 
     override fun onLinkIdentified(link: Link, peer: Peer) = refreshLinkStatus()
 
+    override fun onSos(beacon: SosBeacon) {
+        recentSos = beacon
+        val title = "SOS — ${beacon.fromName ?: beacon.from.display}"
+        val body = if (beacon.text.isEmpty()) "An SOS beacon is active nearby." else beacon.text
+        val n = NotificationCompat.Builder(this, CHANNEL_MESSAGES)
+            .setSmallIcon(R.drawable.ic_stat_ripple).setContentTitle(title).setContentText(body)
+            .setAutoCancel(true).setContentIntent(PendingIntent.getActivity(this, "sos".hashCode(), Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+            .build()
+        getSystemService(NotificationManager::class.java).notify("sos".hashCode(), n)
+    }
+
     // ---- API for the UI -------------------------------------------------------------
+
+    fun setPowerProfile(code: Int) {
+        runCatching { router.setBatteryProfile(code) }
+        _powerProfile.value = if (BatteryProfile.isValid(code)) code else BatteryProfile.BALANCED
+        Log.i(TAG, "power profile -> $code")
+    }
+
+    /** Broadcast an SOS beacon. `shareLocation` attaches a coarse fix only if granted. */
+    suspend fun sendSos(text: String, shareLocation: Boolean) {
+        val location = if (shareLocation) currentLocationOrNull() else null
+        router.sendSos(text, location)
+    }
+
+    /** Best-effort last-known location; null unless the operator granted location permission. */
+    private fun currentLocationOrNull(): SosLocation? {
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return null
+        val lm = getSystemService(LOCATION_SERVICE) as? LocationManager ?: return null
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+        val fix = providers.firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() } ?: return null
+        return SosLocation(
+            latE7 = (fix.latitude * 1e7).toInt(),
+            lngE7 = (fix.longitude * 1e7).toInt(),
+            accuracyMeters = (fix.accuracy.toDouble()).toInt().coerceIn(0, 65_000),
+        )
+    }
 
     suspend fun sendBroadcast(text: String) {
         val id = router.sendBroadcast(text)

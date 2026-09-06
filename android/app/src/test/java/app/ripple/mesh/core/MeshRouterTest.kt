@@ -37,11 +37,13 @@ class MeshRouterTest {
     private class Node(val name: String, val net: Net) : RouterListener {
         val inbox = ArrayList<InboundMessage>()
         val acks = ArrayList<ByteArray>()
+        val sosInbox = ArrayList<SosBeacon>()
         val links = ArrayList<FakeLink>()
         val router = MeshRouter(Identity.generate(), name, this)
         override fun onMessage(message: InboundMessage) { inbox.add(message) }
         override fun onAck(messageId: ByteArray, from: NodeId) { acks.add(messageId) }
         override fun onPeersChanged(peers: List<Peer>) {}
+        override fun onSos(beacon: SosBeacon) { sosInbox.add(beacon) }
     }
 
     private companion object {
@@ -144,5 +146,104 @@ class MeshRouterTest {
             if (link.remote === b2) restored.onReceive(link.twin, bytes) else link.remote.router.onReceive(link.twin, bytes)
         }
         assertEquals("persisted", c.inbox.last().text)
+    }
+
+    // ---- Phase 2: SOS beacons, rate limiting, 72 h store-and-forward, battery profiles ----
+
+    @Test fun `sos beacon floods the mesh carrying the opted-in gps fix`() {
+        val net = Net()
+        val (a, b, c, d) = listOf("A", "B", "C", "D").map { Node(it, net) }
+        link(a, b); link(b, c); link(c, d); net.settle()
+        val loc = SosLocation(1234567, -7654321, 20)
+        a.router.sendSos("trapped in valley", loc); net.settle()
+        for (n in listOf(b, c, d)) {
+            assertEquals(1, n.sosInbox.size)
+            assertEquals("trapped in valley", n.sosInbox.last().text)
+            assertEquals(loc, n.sosInbox.last().location)
+        }
+        // Beacons are surfaced separately from ordinary chat messages.
+        assertTrue(b.inbox.none { it.text == "trapped in valley" })
+    }
+
+    @Test fun `sos beacon without gps delivers a null location at every receiver`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net); val c = Node("C", net)
+        link(a, b); link(b, c); net.settle()
+        a.router.sendSos("can you hear me"); net.settle()
+        assertEquals("can you hear me", c.sosInbox.last().text)
+        assertNull(c.sosInbox.last().location)
+    }
+
+    @Test fun `power saver relays sos but not an ordinary broadcast`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net); val c = Node("C", net)
+        link(a, b); link(b, c); net.settle()
+        b.router.setBatteryProfile(BatteryProfile.POWER_SAVER)
+        a.router.sendBroadcast("anyone around?"); net.settle()
+        assertEquals(0, c.inbox.size)          // chat is not forwarded by the power-saver relay
+        a.router.sendSos("in trouble"); net.settle()
+        assertEquals(1, c.sosInbox.size)       // …but the beacon still floods
+    }
+
+    @Test fun `balanced profile relays an ordinary broadcast`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net); val c = Node("C", net)
+        link(a, b); link(b, c); net.settle()
+        assertEquals(BatteryProfile.BALANCED, b.router.batteryProfileCode())
+        a.router.sendBroadcast("hello all"); net.settle()
+        assertEquals("hello all", c.inbox.last().text)
+    }
+
+    @Test fun `rate limiter drops a flooding broadcast source beyond its budget`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net)
+        link(a, b); net.settle()
+        b.router.setInboundRateLimit(2, 60_000L)
+        repeat(5) { a.router.sendBroadcast("m$it") }; net.settle()
+        assertEquals(2, b.inbox.count { it.text.startsWith("m") })
+    }
+
+    @Test fun `rate limiter is independent per source`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net); val c = Node("C", net)
+        link(a, b); link(c, b); net.settle()
+        b.router.setInboundRateLimit(1, 60_000L)
+        a.router.sendBroadcast("fromA"); c.router.sendBroadcast("fromC"); net.settle()
+        assertEquals(1, b.inbox.count { it.text == "fromA" })
+        assertEquals(1, b.inbox.count { it.text == "fromC" })
+        a.router.sendBroadcast("fromA2"); net.settle()
+        assertEquals(1, b.inbox.count { it.text.startsWith("fromA") })
+    }
+
+    @Test fun `rate limiter never throttles direct end-to-end messages`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net)
+        link(a, b); net.settle()
+        b.router.setInboundRateLimit(2, 60_000L)
+        repeat(5) { a.router.sendDirect(b.router.selfId, "direct$it") }; net.settle()
+        assertEquals(5, b.inbox.count { it.text.startsWith("direct") })
+    }
+
+    @Test fun `store-and-forward retention is 72 hours`() {
+        assertEquals(72L * 3600 * 1000, Protocol.RELAY_TTL_MS)
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net); val c = Node("C", net)
+        link(a, b); link(b, c); net.settle()
+        assertEquals(Protocol.RELAY_TTL_MS, b.router.relayRetentionMs)
+        unlink(b, c)
+        a.router.sendDirect(c.router.selfId, "catch up in 72h"); net.settle()
+        assertEquals(0, c.inbox.size)
+        link(b, c); net.settle()
+        assertEquals("catch up in 72h", c.inbox.last().text)
+    }
+
+    @Test fun `power saver still delivers the broadcast addressed to it`() {
+        val net = Net()
+        val a = Node("A", net); val b = Node("B", net); val c = Node("C", net)
+        link(a, b); link(b, c); net.settle()
+        b.router.setBatteryProfile(BatteryProfile.POWER_SAVER)
+        a.router.sendBroadcast("leaf"); net.settle()
+        assertTrue(b.inbox.any { it.text == "leaf" })  // receives…
+        assertEquals(0, c.inbox.size)                  // …but does not pass it on
     }
 }

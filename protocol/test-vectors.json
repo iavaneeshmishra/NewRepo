@@ -55,6 +55,30 @@
     "unsignedBytes": "01030007d0d1d2d3d4d5d6d7d8d9dadbdcdddedf6fc66a90486171ca2bad0fd610d99eae00000199155c6db80010b0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
     "fullPacket": "01030007d0d1d2d3d4d5d6d7d8d9dadbdcdddedf6fc66a90486171ca2bad0fd610d99eae00000199155c6db80010b0b1b2b3b4b5b6b7b8b9babbbcbdbebfd5ff8c293b333d3d7f45fa38a8b9e19f1996f4e76132da0553951bbd5d30c29be6ab9aba68904d3971a22504c6520096162feae11a3595ec7dec99b6274c8503"
   },
+  "sos": {
+    "text": "Need help at the north gate",
+    "location": {
+      "latE7": 285430001,
+      "lngE7": -7709002,
+      "accuracyMeters": 15
+    },
+    "payload": "011b4e6565642068656c7020617420746865206e6f7274682067617465110350f1ff8a5eb6000f",
+    "noLocationPayload": "00066e6f20677073",
+    "noLocationText": "no gps",
+    "unsignedBytes": "01040007e0e1e2e3e4e5e6e7e8e9eaebecedeeef2bad0fd610d99eae000000000000000000000199155c71a00027011b4e6565642068656c7020617420746865206e6f7274682067617465110350f1ff8a5eb6000f",
+    "signingDigest": "c2a922228f15a94156e1b9aaa322fa5e8f6e1abab3c1a677091326d2ea57bb1c",
+    "fullPacket": "01040007e0e1e2e3e4e5e6e7e8e9eaebecedeeef2bad0fd610d99eae000000000000000000000199155c71a00027011b4e6565642068656c7020617420746865206e6f7274682067617465110350f1ff8a5eb6000f67f80be787de4d6c2944d8b314aac4585fb8ab4465a2d5f266671ed6841360e56c27e73b846a9450eb6073e64f61f1317345c0241c266e5da4b0f6bc575225a7",
+    "decoded": {
+      "type": 4,
+      "flags": 0,
+      "ttl": 7,
+      "messageId": "e0e1e2e3e4e5e6e7e8e9eaebecedeeef",
+      "source": "2bad0fd610d99eae",
+      "destination": "0000000000000000",
+      "timestamp": "1757000004000",
+      "payloadLength": 39
+    }
+  },
   "fragmentation": {
     "frameSize": 100,
     "streamId": 48879,

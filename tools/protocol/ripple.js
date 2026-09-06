@@ -14,8 +14,27 @@ const SIGNATURE_SIZE = 64;
 const HKDF_INFO = Buffer.from('ripple/v1/msg', 'utf8');
 const BROADCAST_ID = Buffer.alloc(8, 0);
 
-const PacketType = Object.freeze({ ANNOUNCE: 1, MESSAGE: 2, ACK: 3 });
+const PacketType = Object.freeze({ ANNOUNCE: 1, MESSAGE: 2, ACK: 3, SOS: 4 });
 const Flags = Object.freeze({ ENCRYPTED: 0x01 });
+
+// SOS beacon payload limits (PROTOCOL.md §2.2).
+const MAX_SOS_TEXT = 128;
+const SOS_FLAG_HAS_LOCATION = 0x01;
+
+// Battery-dependent relay policies (PROTOCOL.md §7).
+const BatteryProfile = Object.freeze({ PERFORMANCE: 0, BALANCED: 1, POWER_SAVER: 2 });
+
+/** Store-and-forward guarantee: relayed packets are held for 72 h (PROTOCOL.md §6). */
+const RELAY_RETENTION_MS = 72 * 3600 * 1000;
+
+/**
+ * Whether a node running on the given battery profile relays ordinary (non-SOS,
+ * non-ANNOUNCE) packets it is merely passing on. POWER_SAVER conserves battery by
+ * acting as a leaf: it still relays ANNOUNCEs and SOS beacons, but not chat traffic.
+ */
+function relaysOrdinary(profile) {
+  return profile !== BatteryProfile.POWER_SAVER;
+}
 
 // ---------------------------------------------------------------- identity --
 
@@ -219,6 +238,80 @@ function eciesDecrypt({ recipientIdentity, messageId, source, destination, paylo
   return Buffer.concat([decipher.update(ct), decipher.final()]);
 }
 
+// ---------------------------------------------------------------- sos -------
+
+/**
+ * SOS beacon payload (PROTOCOL.md §2.2). `location` is optional and only present
+ * when the sender has opted in to sharing GPS; nothing about it leaves the mesh.
+ *
+ * @param {{ text?: string, location?: {latE7:number, lngE7:number, accuracyMeters:number} }} opts
+ * @returns {Buffer}
+ */
+function encodeSos(opts = {}) {
+  const textBytes = Buffer.from(String(opts.text ?? ''), 'utf8');
+  if (textBytes.length > MAX_SOS_TEXT) throw new Error('sos text too long');
+  const hasLocation = opts.location != null;
+  const body = Buffer.alloc(2 + textBytes.length + (hasLocation ? 10 : 0));
+  body[0] = hasLocation ? SOS_FLAG_HAS_LOCATION : 0;
+  body[1] = textBytes.length;
+  textBytes.copy(body, 2);
+  if (hasLocation) {
+    const o = 2 + textBytes.length;
+    body.writeInt32BE(opts.location.latE7 | 0, o);
+    body.writeInt32BE(opts.location.lngE7 | 0, o + 4);
+    body.writeUInt16BE(opts.location.accuracyMeters | 0, o + 8);
+  }
+  return body;
+}
+
+/**
+ * @param {Buffer} payload
+ * @returns {{ flags:number, text:string, location:null | {latE7:number, lngE7:number, accuracyMeters:number} }}
+ */
+function decodeSos(payload) {
+  if (payload.length < 2) throw new Error('sos payload too short');
+  const flags = payload[0];
+  const textLen = payload[1];
+  if (textLen > MAX_SOS_TEXT || payload.length < 2 + textLen) throw new Error('sos payload malformed');
+  const text = payload.subarray(2, 2 + textLen).toString('utf8');
+  const hasLocation = (flags & SOS_FLAG_HAS_LOCATION) !== 0;
+  if (hasLocation && payload.length !== 2 + textLen + 10) throw new Error('sos payload length mismatch');
+  if (!hasLocation && payload.length !== 2 + textLen) throw new Error('sos payload trailing bytes');
+  if (!hasLocation) return { flags, text, location: null };
+  const o = 2 + textLen;
+  return {
+    flags, text,
+    location: { latE7: payload.readInt32BE(o), lngE7: payload.readInt32BE(o + 4), accuracyMeters: payload.readUInt16BE(o + 8) },
+  };
+}
+
+// ---------------------------------------------------------------- rate limit -
+
+/**
+ * A sliding-window counter keyed independently per caller (the router keeps one
+ * instance per message source). Allows at most `max` events in any `windowMs`
+ * window; once the budget is spent the caller must drop the event.
+ */
+class RateLimiter {
+  constructor(max, windowMs) {
+    if (!(max > 0) || !(windowMs > 0)) throw new Error('rate limiter needs max>0, windowMs>0');
+    this.max = max;
+    this.windowMs = windowMs;
+    this.stamps = [];
+  }
+
+  /** @returns {boolean} true if an event is within budget and was recorded. */
+  allow(now = Date.now()) {
+    const cutoff = now - this.windowMs;
+    let i = 0;
+    while (i < this.stamps.length && this.stamps[i] <= cutoff) i++;
+    if (i > 0) this.stamps.splice(0, i);
+    if (this.stamps.length >= this.max) return false;
+    this.stamps.push(now);
+    return true;
+  }
+}
+
 // ---------------------------------------------------------------- fragments -
 
 function fragment(packetBytes, frameSize, streamId) {
@@ -254,8 +347,10 @@ class Reassembler {
 
 module.exports = {
   VERSION, MAX_TTL, MAX_PAYLOAD, HEADER_SIZE, SIGNATURE_SIZE, BROADCAST_ID, PacketType, Flags,
+  MAX_SOS_TEXT, SOS_FLAG_HAS_LOCATION, BatteryProfile, RELAY_RETENTION_MS, relaysOrdinary,
   generateIdentity, identityFromPrivateScalar, publicKeyWire, publicKeyFromWire, nodeIdFromPublicKey, formatNodeId,
   encodeUnsigned, signingDigest, signingInput, sign, verify, encode, decode, buildPacket,
   encodeAnnounce, decodeAnnounce, eciesEncrypt, eciesDecrypt, deriveKey,
+  encodeSos, decodeSos, RateLimiter,
   fragment, Reassembler,
 };

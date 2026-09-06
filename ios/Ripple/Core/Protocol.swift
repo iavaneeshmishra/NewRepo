@@ -15,8 +15,13 @@ enum MeshProtocol {
     static let hkdfInfo = Data("ripple/v1/msg".utf8)
 
     static let seenTTL: TimeInterval = 24 * 3600
-    static let relayTTL: TimeInterval = 24 * 3600
+    // Store-and-forward guarantee: relayed packets are held for 72 h.
+    static let relayTTL: TimeInterval = 72 * 3600
     static let reassemblyTTL: TimeInterval = 10
+
+    // SOS beacon payload (PROTOCOL.md §2.2).
+    static let maxSosText = 128
+    static let sosFlagHasLocation: UInt8 = 0x01
 
     static let serviceUUID = "7E2C4B10-4B7D-4E3A-9C1F-8A2E5D6F1A01"
     static let rxUUID = "7E2C4B10-4B7D-4E3A-9C1F-8A2E5D6F1A02"
@@ -24,11 +29,112 @@ enum MeshProtocol {
 }
 
 enum PacketType: UInt8 {
-    case announce = 1, message = 2, ack = 3
+    case announce = 1, message = 2, ack = 3, sos = 4
 }
 
 struct Flags {
     static let encrypted: UInt8 = 0x01
+}
+
+/// Battery-dependent relay policy (PROTOCOL.md §7).
+enum BatteryProfile: Int, CaseIterable {
+    case performance = 0
+    case balanced = 1
+    case powerSaver = 2
+
+    /// POWER_SAVER conserves battery by not relaying ordinary chat; SOS/ANNOUNCE always relay.
+    var relaysOrdinary: Bool { self != .powerSaver }
+}
+
+/// A decoded SOS beacon payload (PROTOCOL.md §2.2). `location` is nil unless GPS was opted in.
+struct SosLocation: Equatable {
+    let latE7: Int32
+    let lngE7: Int32
+    let accuracyMeters: Int
+}
+
+struct SosPayload {
+    let flags: UInt8
+    let text: String
+    let location: SosLocation?
+}
+
+enum SosError: Error { case textTooLong, malformed }
+
+enum SosCodec {
+    static func encode(text: String, location: SosLocation?) throws -> Data {
+        let textBytes = Data(text.utf8)
+        guard textBytes.count <= MeshProtocol.maxSosText else { throw SosError.textTooLong }
+        var d = Data()
+        d.append(location == nil ? 0 : MeshProtocol.sosFlagHasLocation)
+        d.append(UInt8(textBytes.count))
+        d.append(textBytes)
+        if let loc = location {
+            d.append(int32(loc.latE7)); d.append(int32(loc.lngE7))
+            d.append(uint16(loc.accuracyMeters))
+        }
+        return d
+    }
+
+    static func decode(_ payload: Data) throws -> SosPayload {
+        let p = Data(payload)
+        guard p.count >= 2 else { throw SosError.malformed }
+        let flags = p[0]
+        let textLen = Int(p[1])
+        guard textLen <= MeshProtocol.maxSosText, p.count >= 2 + textLen else { throw SosError.malformed }
+        guard let text = String(data: p.subdata(in: 2..<(2 + textLen)), encoding: .utf8) else { throw SosError.malformed }
+        let hasLocation = flags & MeshProtocol.sosFlagHasLocation != 0
+        if hasLocation {
+            guard p.count == 2 + textLen + 10 else { throw SosError.malformed }
+            let base = 2 + textLen
+            let lat = readInt32(p, at: base)
+            let lng = readInt32(p, at: base + 4)
+            let acc = Int(readUInt16(p, at: base + 8))
+            return SosPayload(flags: flags, text: text, location: SosLocation(latE7: lat, lngE7: lng, accuracyMeters: acc))
+        }
+        guard p.count == 2 + textLen else { throw SosError.malformed }
+        return SosPayload(flags: flags, text: text, location: nil)
+    }
+
+    private static func int32(_ v: Int32) -> Data {
+        var x = v.bigEndian
+        return withUnsafeBytes(of: &x) { Data($0) }
+    }
+    private static func uint16(_ v: Int) -> Data {
+        var x = UInt16(v & 0xffff).bigEndian
+        return withUnsafeBytes(of: &x) { Data($0) }
+    }
+    private static func readInt32(_ d: Data, at o: Int) -> Int32 {
+        var v: UInt32 = 0
+        for i in 0..<4 { v = (v << 8) | UInt32(d[o + i]) }
+        return Int32(bitPattern: v)
+    }
+    private static func readUInt16(_ d: Data, at o: Int) -> UInt16 {
+        (UInt16(d[o]) << 8) | UInt16(d[o + 1])
+    }
+}
+
+/// Sliding-window event counter (see PROTOCOL.md §7). One instance per message source.
+final class RateLimiter {
+    private let max: Int
+    private let windowMs: TimeInterval
+    private let now: () -> Date
+    private var stamps: [Date] = []
+
+    init(max: Int, windowMs: TimeInterval, now: @escaping () -> Date = Date.init) {
+        precondition(max > 0 && windowMs > 0)
+        self.max = max; self.windowMs = windowMs; self.now = now
+    }
+
+    /// Returns true if an event is within budget and was recorded.
+    func allow() -> Bool {
+        let t = now()
+        let cutoff = t.addingTimeInterval(-windowMs)
+        stamps.removeAll { $0 <= cutoff }
+        guard stamps.count < max else { return false }
+        stamps.append(t)
+        return true
+    }
 }
 
 enum ProtocolError: Error, Equatable {

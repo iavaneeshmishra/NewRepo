@@ -28,6 +28,10 @@
 	<!-- Bluetooth -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Ripple talks to nearby phones directly over Bluetooth — no internet, no servers. Bluetooth is needed to find, connect to and relay messages through nearby devices.</string>
+
+	<!-- Opt-in SOS location -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>When you trigger an SOS beacon you may opt in to sharing your location so nearby responders can find you. Location is never sent unless you opt in.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

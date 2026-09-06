@@ -31,15 +31,28 @@ struct InboundMessage {
     let timestamp: UInt64
 }
 
+/// Delivery report for an SOS beacon. `location` is nil unless the sender opted in to GPS.
+struct SosBeacon {
+    let messageId: Data
+    let from: NodeId
+    let fromName: String?
+    let text: String
+    let location: SosLocation?
+    let verified: Bool
+    let timestamp: UInt64
+}
+
 protocol RouterListener: AnyObject {
     func router(_ router: MeshRouter, didReceive message: InboundMessage)
     func router(_ router: MeshRouter, didReceiveAck messageId: Data, from: NodeId)
     func router(_ router: MeshRouter, peersDidChange peers: [Peer])
     func router(_ router: MeshRouter, didIdentify link: Link, as peer: Peer)
+    func router(_ router: MeshRouter, didReceiveSos beacon: SosBeacon)
 }
 
 extension RouterListener {
     func router(_ router: MeshRouter, didIdentify link: Link, as peer: Peer) {}
+    func router(_ router: MeshRouter, didReceiveSos beacon: SosBeacon) {}
 }
 
 /// Transport-agnostic implementation of PROTOCOL.md §4. Behaviourally identical to
@@ -75,6 +88,29 @@ final class MeshRouter {
     private var seenOrder: [String] = []
     private var relayStore: [String: RelayEntry] = [:]
     private var relayOrder: [String] = []
+
+    // Phase 2 policy state.
+    private var batteryProfile = BatteryProfile.balanced
+    private var inboundRateCfg: (max: Int, windowMs: TimeInterval)?
+    private var inboundRate: [String: RateLimiter] = [:]
+
+    /// Store-and-forward retention (72 h, PROTOCOL.md §6).
+    var relayRetention: TimeInterval { MeshProtocol.relayTTL }
+    var batteryProfileCode: Int { batteryProfile.rawValue }
+    func setBatteryProfile(_ code: Int) {
+        locked {
+            guard let p = BatteryProfile(rawValue: code) else { return }
+            batteryProfile = p
+        }
+    }
+
+    /// Cap how many broadcast/SOS packets a single source may push through this node per window.
+    func setInboundRateLimit(max: Int, windowMs: TimeInterval) {
+        locked {
+            inboundRateCfg = (max, windowMs)
+            inboundRate.removeAll()
+        }
+    }
 
     init(identity: Identity, displayName: String, listener: RouterListener?, now: @escaping () -> Date = Date.init, maxSeen: Int = 5000, maxRelay: Int = 500) {
         self.identity = identity; self.displayName = displayName; self.listener = listener
@@ -117,6 +153,12 @@ final class MeshRouter {
     @discardableResult
     func sendBroadcast(_ text: String) throws -> Data {
         originate(try PacketFactory.broadcastText(identity, text))
+    }
+
+    /// Broadcast an SOS beacon. `location` is only sent if the operator opted in to sharing GPS.
+    @discardableResult
+    func sendSos(text: String, location: SosLocation? = nil) throws -> Data {
+        originate(try PacketFactory.sos(identity, text: text, location: location))
     }
 
     enum SendError: Error { case unknownPeer(NodeId) }
@@ -186,11 +228,25 @@ final class MeshRouter {
         if Double(p.timestamp) / 1000 > t.timeIntervalSince1970 + MeshProtocol.seenTTL { return }
         if seen[p.messageIdHex] != nil { return }
         markSeen(p, at: t)
+        guard rateAllows(p) else { return } // per-source broadcast flood cap (when configured)
 
         if p.type == .announce { handleAnnounce(link, p, at: t); return }
 
         let forMe = p.destination == selfId
         let isBroadcast = p.destination.isBroadcast
+
+        if p.type == .sos {
+            if !isBroadcast { relay(p, from: link); return }
+            let peer = peers[p.source.hex]
+            let verified = peer.map { Crypto.verify($0.publicKey, unsignedPacket: p.encodeUnsigned(), rawSignature: p.signature) } ?? false
+            if peer != nil && !verified { return } // forged beacon from a known peer
+            guard let sos = try? SosCodec.decode(p.payload) else { relay(p, from: link); return }
+            listener?.router(self, didReceiveSos: SosBeacon(messageId: p.messageId, from: p.source, fromName: peer?.name,
+                                                            text: sos.text, location: sos.location, verified: verified, timestamp: p.timestamp))
+            relay(p, from: link) // beacons always flood onward
+            return
+        }
+
         if forMe || isBroadcast {
             let peer = peers[p.source.hex]
             let verified = peer.map { Crypto.verify($0.publicKey, unsignedPacket: p.encodeUnsigned(), rawSignature: p.signature) } ?? false
@@ -214,6 +270,8 @@ final class MeshRouter {
                 if forMe && p.payload.count == MeshProtocol.messageIdSize { listener?.router(self, didReceiveAck: p.payload, from: p.source) }
             case .announce:
                 break
+            case .sos:
+                break // handled above
             }
         }
         if !forMe { relay(p, from: link) }
@@ -240,8 +298,29 @@ final class MeshRouter {
 
     // MARK: Internals
 
+    /// ANNOUNCEs and SOS beacons always relay (safety/liveness); ordinary chat does not in POWER_SAVER.
+    private func isCritical(_ p: Packet) -> Bool {
+        p.type == .sos || p.type == .announce
+    }
+
+    private func rateAllows(_ p: Packet) -> Bool {
+        guard let cfg = inboundRateCfg else { return true }
+        if p.type != .message && p.type != .sos { return true }
+        if !p.destination.isBroadcast { return true } // direct E2E is never flood-gated
+        let limiter: RateLimiter
+        if let existing = inboundRate[p.source.hex] {
+            limiter = existing
+        } else {
+            let l = RateLimiter(max: cfg.max, windowMs: cfg.windowMs)
+            inboundRate[p.source.hex] = l
+            limiter = l
+        }
+        return limiter.allow()
+    }
+
     private func relay(_ p: Packet, from: Link) {
         guard p.ttl > 1 else { return }
+        if batteryProfile == .powerSaver && !isCritical(p) { return }
         let relayed = p.withTTL(p.ttl - 1)
         store(relayed, from: from)
         broadcast(relayed, except: from)

@@ -40,7 +40,9 @@ import androidx.navigation.navArgument
 import app.ripple.mesh.R
 import app.ripple.mesh.ui.screens.ChatScreen
 import app.ripple.mesh.ui.screens.HomeScreen
+import app.ripple.mesh.ui.screens.PowerScreen
 import app.ripple.mesh.ui.screens.SettingsScreen
+import app.ripple.mesh.ui.screens.SosScreen
 
 class MainActivity : ComponentActivity() {
     private val vm: MeshViewModel by viewModels()
@@ -57,6 +59,7 @@ fun requiredPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= 31) {
     buildList {
         add(Manifest.permission.BLUETOOTH_SCAN); add(Manifest.permission.BLUETOOTH_ADVERTISE); add(Manifest.permission.BLUETOOTH_CONNECT)
         if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.POST_NOTIFICATIONS)
+        add(Manifest.permission.ACCESS_COARSE_LOCATION) // opt-in GPS for SOS beacons
     }.toTypedArray()
 } else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -89,7 +92,11 @@ fun RippleRoot(vm: MeshViewModel, launchIntent: Intent?) {
         composable("chat/{conversation}", arguments = listOf(navArgument("conversation") { type = NavType.StringType })) {
             ChatScreen(vm, conversation = it.arguments!!.getString("conversation")!!, onBack = { nav.popBackStack() })
         }
-        composable("settings") { SettingsScreen(vm, onBack = { nav.popBackStack() }) }
+        composable("settings") {
+            SettingsScreen(vm, onBack = { nav.popBackStack() }, onOpenSos = { nav.navigate("sos") }, onOpenPower = { nav.navigate("power") })
+        }
+        composable("sos") { SosScreen(vm, onBack = { nav.popBackStack() }) }
+        composable("power") { PowerScreen(vm, onBack = { nav.popBackStack() }) }
     }
 }
 

@@ -21,8 +21,31 @@ class MeshRouter {
     this.peers = new Map();       // hex(nodeId) -> { publicKey, publicKeyWire, name, lastSeen, hops }
     this.seen = new Map();        // hex(messageId) -> firstSeenAt
     this.relayStore = new Map();  // hex(messageId) -> { packet, expiresAt, deliveredTo:Set<hexNodeId> }
-    this.maxSeen = 5000; this.maxRelay = 500; this.ttlMs = 24 * 3600 * 1000;
+    this.maxSeen = 5000; this.maxRelay = 500;
+    this.ttlMs = 24 * 3600 * 1000;                 // out-of-band clock tolerance / dedupe horizon
+    this.relayRetentionMs = R.RELAY_RETENTION_MS; // store-and-forward window (72 h)
+    this.batteryProfile = R.BatteryProfile.BALANCED;
+    this.inboundRate = null;                       // RateLimiter per inbound broadcast source once enabled
+    this.inboundRateCfg = null;                    // { max, windowMs }
   }
+
+  /** @returns {number} the new battery profile code */
+  setBatteryProfile(code) {
+    if (!Number.isInteger(code) || code < R.BatteryProfile.PERFORMANCE || code > R.BatteryProfile.POWER_SAVER) throw new Error('bad battery profile');
+    this.batteryProfile = code;
+    return code;
+  }
+
+  /** Cap how many broadcast/SOS packets a single source may push through this node per window. */
+  setInboundRateLimit(max, windowMs) {
+    this.inboundRateCfg = { max, windowMs };
+    this.inboundRate = new Map();
+  }
+
+  /**
+   * Delivery report for an SOS beacon. `location` is null unless the sender opted in.
+   * @typedef {object} SosBeacon
+   */
 
   // ---- outbound -----------------------------------------------------------
 
@@ -47,6 +70,33 @@ class MeshRouter {
     const messageId = crypto.randomBytes(16);
     const payload = R.eciesEncrypt({ recipientWire: peer.publicKeyWire, messageId, source: this.selfId, destination, plaintext: Buffer.from(text, 'utf8') });
     return this.originate(R.buildPacket(this.identity, { type: R.PacketType.MESSAGE, flags: R.Flags.ENCRYPTED, messageId, destination, payload }));
+  }
+
+  /**
+   * Originate an SOS beacon. `location` is sent only when the operator opted in to
+   * sharing GPS ({latE7, lngE7, accuracyMeters}); otherwise no location leaves the device.
+   * @param {string} text
+   * @param {{latE7:number,lngE7:number,accuracyMeters:number}|null} [location]
+   */
+  sendSosBeacon(text, location = null) {
+    const payload = R.encodeSos({ text, location });
+    return this.originate(R.buildPacket(this.identity, { type: R.PacketType.SOS, payload }));
+  }
+
+  // ---- battery / flood helpers --------------------------------------------
+
+  /** ANNOUNCEs and SOS beacons are always relayed (safety/liveness); chat is not in power-saver. */
+  _critical(p) { return p.type === R.PacketType.SOS || p.type === R.PacketType.ANNOUNCE; }
+
+  /** Enforce the per-source broadcast budget when configured. */
+  _rateAllows(p) {
+    if (!this.inboundRateCfg) return true;
+    if (p.type !== R.PacketType.MESSAGE && p.type !== R.PacketType.SOS) return true;
+    if (!p.destination.equals(R.BROADCAST_ID)) return true; // direct E2E is never flood-gated
+    const key = p.source.toString('hex');
+    let lim = this.inboundRate.get(key);
+    if (!lim) { lim = new R.RateLimiter(this.inboundRateCfg.max, this.inboundRateCfg.windowMs); this.inboundRate.set(key, lim); }
+    return lim.allow();
   }
 
   // ---- link lifecycle -----------------------------------------------------
@@ -85,6 +135,7 @@ class MeshRouter {
     const idHex = p.messageId.toString('hex');
     if (this.seen.has(idHex)) return;
     this._markSeen(p, now);
+    if (!this._rateAllows(p)) return;   // per-source broadcast flood cap (when configured)
 
     if (p.type === R.PacketType.ANNOUNCE) {
       let ann; try { ann = R.decodeAnnounce(p.payload); } catch { return; }
@@ -102,6 +153,21 @@ class MeshRouter {
 
     const forMe = p.destination.equals(this.selfId);
     const broadcast = p.destination.equals(R.BROADCAST_ID);
+
+    if (p.type === R.PacketType.SOS) {
+      if (!broadcast) { this._relay(p, link); return; }
+      const peer = this.peers.get(p.source.toString('hex'));
+      const verified = !!peer && R.verify(peer.publicKey, R.encodeUnsigned(p), p.signature);
+      if (peer && !verified) return;            // known peer, bad signature: forged
+      let sos; try { sos = R.decodeSos(p.payload); } catch { this._relay(p, link); return; }
+      if (this.delegate.sos) this.delegate.sos({
+        from: p.source, fromName: peer?.name, verified, broadcast: true,
+        text: sos.text, location: sos.location, timestamp: p.timestamp, messageId: p.messageId,
+      });
+      this._relay(p, link);                     // beacons always flood onward
+      return;
+    }
+
     if (forMe || broadcast) {
       const peer = this.peers.get(p.source.toString('hex'));
       const verified = !!peer && R.verify(peer.publicKey, R.encodeUnsigned(p), p.signature);
@@ -126,6 +192,7 @@ class MeshRouter {
 
   _relay(p, fromLink) {
     if (p.ttl <= 1) return;
+    if (this.batteryProfile === R.BatteryProfile.POWER_SAVER && !this._critical(p)) return; // leaf: don't burn battery forwarding chat
     const relayed = { ...p, ttl: p.ttl - 1 };
     this._store(relayed, fromLink);
     this._broadcast(relayed, fromLink);
@@ -145,7 +212,7 @@ class MeshRouter {
     if (p.type === R.PacketType.ANNOUNCE) return; // announces are refreshed per link, never replayed
     const deliveredTo = new Set();
     if (fromLink?.peerHex) deliveredTo.add(fromLink.peerHex);
-    this.relayStore.set(p.messageId.toString('hex'), { packet: p, expiresAt: Date.now() + this.ttlMs, deliveredTo });
+    this.relayStore.set(p.messageId.toString('hex'), { packet: p, expiresAt: Date.now() + this.relayRetentionMs, deliveredTo });
     while (this.relayStore.size > this.maxRelay) this.relayStore.delete(this.relayStore.keys().next().value);
   }
 
@@ -166,16 +233,18 @@ class FakeLink {
 class MeshNode {
   static queue = [];
   constructor(name) {
-    this.name = name; this.inbox = []; this.acks = []; this._links = [];
+    this.name = name; this.inbox = []; this.acks = []; this.sosInbox = []; this._links = [];
     this.router = new MeshRouter(R.generateIdentity(), name, {
       deliver: (m) => this.inbox.push(m),
       ack: (id) => this.acks.push(id),
+      sos: (b) => this.sosInbox.push(b),
       send: (link, bytes) => { if (link.open) MeshNode.queue.push({ link, bytes }); },
       links: () => this._links,
     });
   }
   sendBroadcast(t) { return this.router.sendBroadcastText(t); }
   sendDirect(dest, t) { return this.router.sendDirectText(dest, t); }
+  sendSos(text, location) { return this.router.sendSosBeacon(text, location); }
 
   static link(a, b) {
     const la = new FakeLink(a, b), lb = new FakeLink(b, a);

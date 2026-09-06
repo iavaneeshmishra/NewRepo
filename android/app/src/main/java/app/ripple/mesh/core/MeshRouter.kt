@@ -33,11 +33,22 @@ data class InboundMessage(
     val timestamp: Long,
 )
 
+/** Delivery report for an SOS beacon. `location` is null unless the sender opted in to GPS. */
+data class SosBeacon(
+    val from: NodeId,
+    val fromName: String?,
+    val text: String,
+    val location: SosLocation?,
+    val verified: Boolean,
+    val timestamp: Long,
+)
+
 interface RouterListener {
     fun onMessage(message: InboundMessage)
     fun onAck(messageId: ByteArray, from: NodeId)
     fun onPeersChanged(peers: List<Peer>)
     fun onLinkIdentified(link: Link, peer: Peer) {}
+    fun onSos(beacon: SosBeacon) {}
 }
 
 /**
@@ -71,7 +82,27 @@ class MeshRouter(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RelayEntry>) = size > maxRelay
     }
 
+    // Phase 2 policy state.
+    private var batteryProfile: Int = BatteryProfile.BALANCED
+    private var inboundRateCfg: Pair<Int, Long>? = null
+    private val inboundRate = HashMap<String, RateLimiter>()
+
     val selfId: NodeId get() = identity.nodeId
+    /** Store-and-forward retention (72 h, PROTOCOL.md §6). */
+    val relayRetentionMs: Long get() = Protocol.RELAY_TTL_MS
+    fun batteryProfileCode(): Int = lock.withLock { batteryProfile }
+    fun setBatteryProfile(code: Int): Unit = lock.withLock {
+        require(BatteryProfile.isValid(code)) { "bad battery profile $code" }
+        batteryProfile = code
+    }
+
+    /** Cap how many broadcast/SOS packets a single source may push through this node per window. */
+    fun setInboundRateLimit(max: Int, windowMs: Long): Unit = lock.withLock {
+        require(max > 0 && windowMs > 0)
+        inboundRateCfg = max to windowMs
+        inboundRate.clear()
+    }
+
     fun peers(): List<Peer> = lock.withLock { peers.values.toList() }
     fun peer(nodeId: NodeId): Peer? = lock.withLock { peers[nodeId.hex] }
     fun linkCount(): Int = lock.withLock { links.size }
@@ -107,6 +138,9 @@ class MeshRouter(
         val peer = peer(destination) ?: throw IllegalStateException("Unknown peer ${destination.display}")
         return originate(PacketFactory.directText(identity, destination, peer.publicKeyWire, text))
     }
+
+    /** Broadcast an SOS beacon. `location` is only sent if the operator opted in to sharing GPS. */
+    fun sendSos(text: String, location: SosLocation? = null): ByteArray = originate(PacketFactory.sos(identity, text, location))
 
     private fun originate(packet: Packet): ByteArray = lock.withLock {
         markSeen(packet)
@@ -155,11 +189,24 @@ class MeshRouter(
         if (p.timestamp > now + Protocol.SEEN_TTL_MS) return
         if (seen.containsKey(p.messageIdHex)) return
         markSeen(p)
+        if (!rateAllows(p)) return // per-source broadcast flood cap (when configured)
 
         if (p.type == PacketType.ANNOUNCE) { handleAnnounce(link, p, now); return }
 
         val forMe = p.destination.hex == selfId.hex
         val isBroadcast = p.destination.isBroadcast
+
+        if (p.type == PacketType.SOS) {
+            if (!isBroadcast) { relay(p, link); return }
+            val peer = peers[p.source.hex]
+            val verified = peer != null && Crypto.verify(peer.publicKey, p.encodeUnsigned(), p.signature)
+            if (peer != null && !verified) return // forged beacon from a known peer
+            val sos = try { SosCodec.decode(p.payload) } catch (_: Exception) { relay(p, link); return }
+            listener.onSos(SosBeacon(p.source, peer?.name, sos.text, sos.location, verified, p.timestamp))
+            relay(p, link) // beacons always flood onward
+            return
+        }
+
         if (forMe || isBroadcast) {
             val peer = peers[p.source.hex]
             val verified = peer != null && Crypto.verify(peer.publicKey, p.encodeUnsigned(), p.signature)
@@ -204,8 +251,20 @@ class MeshRouter(
 
     // ---- internals ----------------------------------------------------------------
 
+    /** ANNOUNCEs and SOS beacons always relay (safety/liveness); ordinary chat does not in POWER_SAVER. */
+    private fun isCritical(p: Packet) = p.type == PacketType.SOS || p.type == PacketType.ANNOUNCE
+
+    private fun rateAllows(p: Packet): Boolean {
+        val cfg = inboundRateCfg ?: return true
+        if (p.type != PacketType.MESSAGE && p.type != PacketType.SOS) return true
+        if (!p.destination.isBroadcast) return true // direct E2E is never flood-gated
+        val limiter = inboundRate.getOrPut(p.source.hex) { RateLimiter(cfg.first, cfg.second) }
+        return limiter.allow()
+    }
+
     private fun relay(p: Packet, from: Link) {
         if (p.ttl <= 1) return
+        if (batteryProfile == BatteryProfile.POWER_SAVER && !isCritical(p)) return
         val relayed = p.withTtl(p.ttl - 1)
         store(relayed, from)
         broadcast(relayed, from)

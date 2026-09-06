@@ -17,8 +17,13 @@ object Protocol {
     val HKDF_INFO: ByteArray = "ripple/v1/msg".toByteArray(Charsets.UTF_8)
 
     const val SEEN_TTL_MS = 24L * 3600 * 1000
-    const val RELAY_TTL_MS = 24L * 3600 * 1000
+    // Store-and-forward guarantee: relayed packets are held for 72 h.
+    const val RELAY_TTL_MS = 72L * 3600 * 1000
     const val REASSEMBLY_TTL_MS = 10_000L
+
+    // SOS beacon payload (PROTOCOL.md §2.2).
+    const val MAX_SOS_TEXT = 128
+    const val SOS_FLAG_HAS_LOCATION = 0x01
 
     // BLE
     const val SERVICE_UUID = "7E2C4B10-4B7D-4E3A-9C1F-8A2E5D6F1A01"
@@ -28,7 +33,7 @@ object Protocol {
 }
 
 enum class PacketType(val code: Int) {
-    ANNOUNCE(1), MESSAGE(2), ACK(3);
+    ANNOUNCE(1), MESSAGE(2), ACK(3), SOS(4);
 
     companion object {
         fun from(code: Int): PacketType? = entries.firstOrNull { it.code == code }
@@ -37,6 +42,59 @@ enum class PacketType(val code: Int) {
 
 object Flags {
     const val ENCRYPTED = 0x01
+}
+
+/** Battery-dependent relay policy (PROTOCOL.md §7). */
+object BatteryProfile {
+    const val PERFORMANCE = 0
+    const val BALANCED = 1
+    const val POWER_SAVER = 2
+
+    const val MIN = PERFORMANCE
+    const val MAX = POWER_SAVER
+
+    fun isValid(code: Int) = code in MIN..MAX
+
+    /** POWER_SAVER conserves battery by not relaying ordinary chat; SOS/ANNOUNCE always relay. */
+    fun relaysOrdinary(code: Int): Boolean = code != POWER_SAVER
+}
+
+/** A decoded SOS beacon payload (PROTOCOL.md §2.2). `location` is null unless GPS was opted in. */
+data class SosPayload(val flags: Int, val text: String, val location: SosLocation?)
+
+data class SosLocation(val latE7: Int, val lngE7: Int, val accuracyMeters: Int)
+
+object SosCodec {
+    fun encode(text: String, location: SosLocation?): ByteArray {
+        val textBytes = text.toByteArray(Charsets.UTF_8)
+        require(textBytes.size <= Protocol.MAX_SOS_TEXT) { "sos text too long" }
+        val buf = java.nio.ByteBuffer.allocate(2 + textBytes.size + (if (location != null) 10 else 0))
+        buf.put((if (location != null) Protocol.SOS_FLAG_HAS_LOCATION else 0).toByte())
+        buf.put(textBytes.size.toByte())
+        buf.put(textBytes)
+        if (location != null) {
+            buf.putInt(location.latE7)
+            buf.putInt(location.lngE7)
+            buf.putShort(location.accuracyMeters.toShort())
+        }
+        return buf.array()
+    }
+
+    fun decode(payload: ByteArray): SosPayload {
+        if (payload.size < 2) throw ProtocolException("sos payload too short")
+        val flags = payload[0].toInt() and 0xff
+        val textLen = payload[1].toInt() and 0xff
+        if (textLen > Protocol.MAX_SOS_TEXT || payload.size < 2 + textLen) throw ProtocolException("sos payload malformed")
+        val text = String(payload, 2, textLen, Charsets.UTF_8)
+        val hasLocation = flags and Protocol.SOS_FLAG_HAS_LOCATION != 0
+        if (hasLocation) {
+            if (payload.size != 2 + textLen + 10) throw ProtocolException("sos payload length mismatch")
+            val b = java.nio.ByteBuffer.wrap(payload, 2 + textLen, 10)
+            return SosPayload(flags, text, SosLocation(b.int, b.int, b.short.toInt() and 0xffff))
+        }
+        if (payload.size != 2 + textLen) throw ProtocolException("sos payload trailing bytes")
+        return SosPayload(flags, text, null)
+    }
 }
 
 /** 8-byte node identifier. Value type with proper equality so it can key maps. */

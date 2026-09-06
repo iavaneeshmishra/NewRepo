@@ -51,6 +51,10 @@ object PacketFactory {
     fun ack(identity: Identity, destination: NodeId, acknowledgedMessageId: ByteArray): Packet =
         build(identity, PacketType.ACK, acknowledgedMessageId, destination)
 
+    /** An SOS beacon, broadcast mesh-wide. `location` is only included when GPS was opted in. */
+    fun sos(identity: Identity, text: String, location: SosLocation? = null): Packet =
+        build(identity, PacketType.SOS, SosCodec.encode(text, location))
+
     private fun String.trimToNameLimit(): String {
         var s = this
         while (s.toByteArray(Charsets.UTF_8).size > Protocol.MAX_NAME_BYTES) s = s.dropLast(1)

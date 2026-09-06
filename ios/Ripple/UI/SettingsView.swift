@@ -23,6 +23,15 @@ struct SettingsView: View {
                     LabeledContent("Advertising", value: mesh.status.advertising ? "Yes" : "No")
                     LabeledContent("Direct links", value: "\(mesh.status.directLinks)")
                     LabeledContent("Peers known", value: "\(mesh.status.knownPeers)")
+                    LabeledContent("Power profile", value: mesh.powerProfile.title)
+                }
+                Section {
+                    NavigationLink { SosView() } label: {
+                        Label("SOS beacon", systemImage: "exclamationmark.octagon")
+                    }
+                    NavigationLink { PowerView() } label: {
+                        Label("Power profile", systemImage: "battery.75")
+                    }
                 }
                 Section {
                     Text("Ripple never uses the internet. Messages hop phone-to-phone over Bluetooth LE, are signed by the sender, and direct messages are end-to-end encrypted. Messages for peers who are out of range are held and delivered when the mesh reconnects.")
