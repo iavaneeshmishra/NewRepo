@@ -361,3 +361,20 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+## --- Ripple ---------------------------------------------------------------
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/captures/
+# iOS (project is generated from ios/project.yml with xcodegen)
+ios/Ripple.xcodeproj/
+ios/*.xcworkspace/
+ios/DerivedData/
+ios/**/xcuserdata/
+# Node
+node_modules/
