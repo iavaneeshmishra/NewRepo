@@ -70,8 +70,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
-      - run: xcodegen generate && ls Ripple.xcodeproj
+      - name: Generate project
         working-directory: ios
+        run: |
+          {
+            echo "### iOS environment"; echo '```'
+            sw_vers; xcodebuild -version; xcodegen --version
+            echo "--- xcodegen generate"; xcodegen generate 2>&1 | tee xcodegen.log
+            echo "--- project"; ls -la Ripple.xcodeproj || true
+            echo "--- project.pbxproj (head)"; head -c 600 Ripple.xcodeproj/project.pbxproj || true
+            echo "--- schemes"; xcodebuild -list -project Ripple.xcodeproj 2>&1 | head -30 || true
+            echo '```'
+          } > env.md; cat env.md
       - name: Pick a simulator
         id: sim
         run: |
@@ -98,6 +108,7 @@ jobs:
         working-directory: ios
         run: |
           {
+            cat env.md
             echo "### iOS build errors"
             echo '```'
             grep -E "error:|Executed|Test Suite 'All tests'|\*\* (BUILD|TEST) " xcodebuild.log | sed 's#/Users/runner/work/NewRepo/NewRepo/##' | sort -u | head -80
