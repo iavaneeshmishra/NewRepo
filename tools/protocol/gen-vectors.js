@@ -105,7 +105,7 @@ vectors.ack = { unsignedBytes: hex(R.encodeUnsigned(ack)), fullPacket: hex(R.enc
 // --- sos beacon (Phase 2)
 const sosLocation = { latE7: 285430001, lngE7: -7709002, accuracyMeters: 15 };
 const sosPayload = R.encodeSos({ text: 'Need help at the north gate', location: sosLocation });
-const sos = stable('sosBeacon', R.buildPacket(alice, {
+const sos = stable('sos', R.buildPacket(alice, {
   type: R.PacketType.SOS, ttl: 7,
   messageId: Buffer.from('e0e1e2e3e4e5e6e7e8e9eaebecedeeef', 'hex'),
   timestamp: 1_757_000_004_000n, payload: sosPayload,
