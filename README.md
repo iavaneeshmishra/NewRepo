@@ -67,9 +67,16 @@ for how the three implementations are kept in sync and
 
 ## Status
 
-Functionally complete v1. Tested by simulation and conformance vectors; needs
-field testing on real hardware. See the *Security* and *Platform notes* sections
-in `docs/ARCHITECTURE.md` for known limitations.
+**Released v1.0.0** (2026-09-07).  Internet-free, E2E-encrypted Bluetooth LE
+mesh messenger for Android and iOS.
+
+- Download the latest build from [Releases](../../releases).
+- Found a bug?  Open a [bug report](../../issues/new?template=bug_report.yml).
+- Want to help test the next version?  See the [beta program](docs/BETA_PROGRAM.md).
+- Release history: [CHANGELOG.md](CHANGELOG.md).
+
+See the *Security* and *Platform notes* sections in `docs/ARCHITECTURE.md` for
+known limitations.
 
 ## License
 

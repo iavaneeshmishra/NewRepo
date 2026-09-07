@@ -3,3 +3,6 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/iavaneeshmishra/NewRepo/security/advisories/new
     about: Please report crypto/protocol vulnerabilities privately as a draft advisory.
+  - name: Beta program
+    url: https://github.com/iavaneeshmishra/NewRepo/blob/master/docs/BETA_PROGRAM.md
+    about: Want to field-test Ripple? See how to join the beta.

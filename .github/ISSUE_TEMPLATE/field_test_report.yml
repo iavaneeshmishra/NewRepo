@@ -1,5 +1,5 @@
 name: Field test report
-description: Results from running docs/FIELD_TESTING.md scenarios on real phones
+description: Results from running docs/FIELD_TESTING.md scenarios on real phones. See docs/BETA_PROGRAM.md for context.
 title: "[field] "
 labels: ["field-test"]
 body:

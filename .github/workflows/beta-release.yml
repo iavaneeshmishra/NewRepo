@@ -1,0 +1,147 @@
+name: Beta / Release build
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write          # create GitHub Release
+  pull-requests: read
+
+jobs:
+  # ── gate: protocol tests must pass ──────────────────────────────────
+  protocol:
+    name: Protocol conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node tools/protocol/test.js
+      - name: Vectors are up to date
+        run: |
+          node tools/protocol/gen-vectors.js && git diff --exit-code protocol/test-vectors.json
+          cmp protocol/test-vectors.json android/app/src/test/resources/test-vectors.json
+          cmp protocol/test-vectors.json ios/RippleTests/Resources/test-vectors.json
+
+  # ── Android debug APK ───────────────────────────────────────────────
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    needs: protocol
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Bootstrap Gradle wrapper
+        working-directory: android
+        run: |
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.9 --no-daemon
+          fi
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --console=plain 2>&1 | tee gradle.log
+      - name: Rename APK with tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "ripple-${TAG}-debug.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ripple-debug-apk
+          path: ripple-v*-debug.apk
+
+  # ── iOS archive ─────────────────────────────────────────────────────
+  ios:
+    name: iOS archive
+    runs-on: macos-15
+    needs: protocol
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - name: Generate project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Pick a simulator (for tests)
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys
+          d=json.load(sys.stdin)["devices"]
+          c=[(k,x) for k,v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
+          c.sort(key=lambda t:t[0]); print(c[-1][1]["udid"])')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Build archive
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild archive -scheme Ripple -project Ripple.xcodeproj \
+            -destination "generic/platform=iOS" \
+            -archivePath Ripple.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            2>&1 | tee xcodebuild.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-archive-log
+          path: ios/xcodebuild.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ripple-ios-archive
+          path: ios/Ripple.xcarchive
+
+  # ── GitHub Release ──────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [android, ios]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Determine if pre-release
+        id: prerelease
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if echo "$TAG" | grep -qiE '(beta|alpha|rc)'; then
+            echo "flag=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build release notes skeleton
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          cat > release-notes.md << 'EOF'
+          ## Ripple ${TAG}
+
+          ### Downloads
+          - **Android**: \`ripple-${TAG}-debug.apk\` below (enable *Install unknown apps*).
+          - **iOS**: see the \`ripple-ios-archive\` artifact (unsigned unless a distribution certificate is configured).
+
+          ### Field testing
+          Please run the [field-test checklist](docs/FIELD_TESTING.md) and file results
+          using the **Field test report** issue template.
+
+          ### What changed
+          <!-- Fill in from commits since last tag -->
+          - ...
+          EOF
+          sed -i "s/\${TAG}/$TAG/g" release-notes.md
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # Collect APK files
+          APK_FILES=$(find artifacts/ripple-debug-apk -name '*.apk' 2>/dev/null | head -5)
+          gh release create "$TAG" \
+            --title "Ripple $TAG" \
+            --notes-file release-notes.md \
+            ${{ steps.prerelease.outputs.flag }} \
+            $APK_FILES

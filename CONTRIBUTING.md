@@ -7,7 +7,7 @@ Thanks for helping build messaging that works when nothing else does.
 | You have… | You can… |
 |---|---|
 | **Just one phone** | Run the app with the *simulated neighbourhood* (Settings → Diagnostics), file UI bugs, improve copy/accessibility, translate strings. |
-| **Two or more phones** | Run the [field-test checklist](docs/FIELD_TESTING.md) and report results — this is the most valuable thing you can do right now. |
+| **Two or more phones** | Run the [field-test checklist](docs/FIELD_TESTING.md) and report results — this is the most valuable thing you can do right now.  See the [beta program](docs/BETA_PROGRAM.md) for how to get the latest build. |
 | **A Mac** | Build and test the iOS app; we have far less iOS field data than Android. |
 | **Node.js only** | Work on the protocol reference (`tools/protocol/`), the simulator, and the spec. |
 | **Nothing to run** | Review `PROTOCOL.md` and `docs/ARCHITECTURE.md` for security or design problems and open an issue. |
