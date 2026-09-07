@@ -2,6 +2,7 @@ package app.ripple.mesh.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,7 +34,7 @@ import app.ripple.mesh.ui.MeshViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: MeshViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: MeshViewModel, onBack: () -> Unit, onOpenSos: () -> Unit = {}, onOpenPower: () -> Unit = {}) {
     val selfId by vm.selfId.collectAsStateWithLifecycle()
     val savedName by vm.displayName.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
@@ -60,6 +61,14 @@ fun SettingsScreen(vm: MeshViewModel, onBack: () -> Unit) {
 
             Text(stringResource(R.string.mesh_status), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.status_detail, if (status.bluetoothOn) "on" else "off", status.directLinks, status.knownPeers))
+
+            HorizontalDivider()
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onOpenSos, modifier = Modifier.weight(1f)) { Text("SOS beacon") }
+                Button(onClick = onOpenPower, modifier = Modifier.weight(1f)) { Text("Power profile") }
+            }
+
             Text(stringResource(R.string.about_blurb), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

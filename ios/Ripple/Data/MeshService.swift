@@ -20,6 +20,9 @@ final class MeshService: ObservableObject, RouterListener {
 
     @Published private(set) var status = MeshStatus()
     @Published var displayName: String
+    @Published private(set) var powerProfile = BatteryProfile.balanced
+    /// Most recently received SOS beacon (drives the SOS screen + notification).
+    @Published private(set) var recentSos: SosBeacon?
 
     let router: MeshRouter
     let container: ModelContainer
@@ -151,6 +154,19 @@ final class MeshService: ObservableObject, RouterListener {
         scheduleStatusRefresh()
     }
 
+    nonisolated func router(_ router: MeshRouter, didReceiveSos beacon: SosBeacon) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.recentSos = beacon
+            let content = UNMutableNotificationContent()
+            content.title = "SOS — \(beacon.fromName ?? beacon.from.display)"
+            content.body = beacon.text.isEmpty ? "An SOS beacon is active nearby." : beacon.text
+            content.sound = .default
+            content.threadIdentifier = "sos"
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: beacon.messageId.hex, content: content, trigger: nil))
+        }
+    }
+
     // MARK: API for the UI
 
     func send(conversation: String, text: String) {
@@ -178,6 +194,16 @@ final class MeshService: ObservableObject, RouterListener {
         displayName = name
         IdentityStore.displayName = name
         router.setDisplayName(name)
+    }
+
+    /// Broadcast an SOS beacon. Pass a `SosLocation` only when the operator opted in to sharing GPS.
+    func sendSos(_ text: String, location: SosLocation?) {
+        _ = try? router.sendSos(text: text, location: location)
+    }
+
+    func setPowerProfile(_ profile: BatteryProfile) {
+        powerProfile = profile
+        router.setBatteryProfile(profile.rawValue)
     }
 
     func markRead(_ conversation: String) {

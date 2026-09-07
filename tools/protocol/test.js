@@ -125,4 +125,62 @@ test('ttl bound: 9-node line, node 9 is out of reach with MAX_TTL=7', () => {
   assert.strictEqual(nodes[8].inbox.length, 0);              // would need an 8th hop
 });
 
+console.log('sos & policy');
+test('SOS payload round trips (opt-in GPS) and omits location when not shared', () => {
+  const loc = { latE7: 285430001, lngE7: 7709002, accuracyMeters: 15 };
+  const p1 = R.decodeSos(R.encodeSos({ text: 'need help 📍', location: loc }));
+  assert.strictEqual(p1.text, 'need help 📍');
+  assert.deepStrictEqual(p1.location, loc);
+  const p2 = R.decodeSos(R.encodeSos({ text: 'can you hear me?' }));
+  assert.strictEqual(p2.location, null);
+  assert.strictEqual(p2.text, 'can you hear me?');
+  assert.strictEqual(R.encodeSos({}).length, 2); // bare beacon = 2-byte header only
+});
+
+test('rate limiter caps bursts within a window and refills after it', () => {
+  const lim = new R.RateLimiter(3, 1000);
+  const t0 = 1_000_000;
+  assert.ok([0, 1, 2].every(() => lim.allow(t0)));
+  assert.ok(!lim.allow(t0));          // budget spent
+  assert.ok(lim.allow(t0 + 1001));    // window slid forward, a slot freed
+});
+
+test('SOS beacon floods the whole mesh and carries the opted-in GPS fix', () => {
+  const nodes = ['A', 'B', 'C', 'D'].map((n) => new MeshNode(n));
+  const [A, B, C, D] = nodes;
+  MeshNode.link(A, B); MeshNode.link(B, C); MeshNode.link(C, D);
+  MeshNode.settle();
+  const loc = { latE7: 1234567, lngE7: -7654321, accuracyMeters: 20 };
+  A.sendSos('trapped in valley', loc);
+  MeshNode.settle();
+  for (const n of [B, C, D]) {
+    assert.strictEqual(n.sosInbox.length, 1, `${n.name} sos count`);
+    assert.strictEqual(n.sosInbox.at(-1).text, 'trapped in valley');
+    assert.deepStrictEqual(n.sosInbox.at(-1).location, loc);
+  }
+  // Beacons are not plain chat messages.
+  assert.ok(!B.inbox.some((m) => m.text === 'trapped in valley'));
+});
+
+test('power-saver relays SOS but stops relaying ordinary broadcasts', () => {
+  const A = new MeshNode('A'), B = new MeshNode('B'), C = new MeshNode('C');
+  MeshNode.link(A, B); MeshNode.link(B, C); MeshNode.settle();
+  B.router.setBatteryProfile(R.BatteryProfile.POWER_SAVER);
+  A.sendBroadcast('anyone around?');      // ordinary chat must NOT be forwarded
+  MeshNode.settle();
+  assert.strictEqual(C.inbox.length, 0);
+  A.sendSos('in trouble');                // …but the SOS beacon still floods
+  MeshNode.settle();
+  assert.strictEqual(C.sosInbox.length, 1);
+});
+
+test('72 h store-and-forward retention and battery relay policy', () => {
+  assert.strictEqual(R.RELAY_RETENTION_MS, 72 * 3600 * 1000);
+  assert.ok(R.relaysOrdinary(R.BatteryProfile.BALANCED));
+  assert.ok(R.relaysOrdinary(R.BatteryProfile.PERFORMANCE));
+  assert.ok(!R.relaysOrdinary(R.BatteryProfile.POWER_SAVER));
+  const n = new MeshNode('x');
+  assert.strictEqual(n.router.relayRetentionMs, R.RELAY_RETENTION_MS);
+});
+
 console.log(`\n${passed} tests passed`);

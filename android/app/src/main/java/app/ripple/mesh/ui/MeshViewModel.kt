@@ -8,6 +8,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.ripple.mesh.core.BatteryProfile
 import app.ripple.mesh.core.NodeId
 import app.ripple.mesh.data.ConversationSummary
 import app.ripple.mesh.data.IdentityStore
@@ -33,6 +34,9 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
 
     val status: StateFlow<MeshStatus> = service.flatMapLatest { it?.status ?: flowOf(MeshStatus()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MeshStatus())
+
+    val powerProfile: StateFlow<Int> = service.flatMapLatest { it?.powerProfile ?: flowOf(BatteryProfile.BALANCED) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BatteryProfile.BALANCED)
 
     val selfId: StateFlow<NodeId?> = service.flatMapLatest { flowOf(it?.router?.selfId) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -71,6 +75,10 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setDisplayName(name: String) = viewModelScope.launch { service.value?.setDisplayName(name) ?: IdentityStore.setDisplayName(getApplication(), name) }
+
+    fun setPowerProfile(code: Int) = viewModelScope.launch { service.value?.setPowerProfile(code) }
+
+    fun sendSos(text: String, shareLocation: Boolean) = viewModelScope.launch { service.value?.sendSos(text, shareLocation) }
 
     override fun onCleared() {
         runCatching { getApplication<Application>().unbindService(connection) }

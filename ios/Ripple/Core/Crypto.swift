@@ -131,6 +131,11 @@ enum PacketFactory {
         try build(id, type: .ack, payload: messageId, destination: destination)
     }
 
+    /// An SOS beacon, broadcast mesh-wide. `location` is only included when GPS was opted in.
+    static func sos(_ id: Identity, text: String, location: SosLocation? = nil) throws -> Packet {
+        try build(id, type: .sos, payload: SosCodec.encode(text: text, location: location))
+    }
+
     private static func trimName(_ name: String) -> String {
         var s = name
         while s.utf8.count > MeshProtocol.maxNameBytes { s.removeLast() }

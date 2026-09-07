@@ -36,7 +36,7 @@ This is a deliberate simplicity trade-off; see `docs/ARCHITECTURE.md § Security
 ```
 offset  size  field
      0     1  version        = 0x01
-     1     1  type           1=ANNOUNCE  2=MESSAGE  3=ACK
+     1     1  type           1=ANNOUNCE  2=MESSAGE  3=ACK  4=SOS
      2     1  flags          bit0 ENCRYPTED (payload is an ECIES box)
      3     1  ttl            remaining hops, 0..MAX_TTL(7). Mutable in flight.
      4    16  messageId      128 random bits, globally unique
@@ -79,6 +79,22 @@ source, flooded like any other packet.
 0   16  acknowledgedMessageId
 ```
 
+**SOS (type 4)** — an emergency beacon, broadcast mesh-wide (destination = Broadcast
+ID, unencrypted, signed). Unlike ordinary traffic it is always relayed by every node
+(including power-saver relays) and is held in the relay store for the full 72 h
+store-and-forward window. Location is **only** present when the operator opted in to
+sharing GPS — nothing leaves the device otherwise.
+```
+0    1  flags         bit0 (0x01) HAS_LOCATION
+1    1  textLength L  (0..128) UTF-8 message length
+2    L  text          optional help/context text (may be empty)
+2+L  4  latE7         signed int32, degrees × 10^7      (present iff HAS_LOCATION)
+6+L  4  lngE7         signed int32, degrees × 10^7
+10+L 2  accuracyMeters uint16 (best-effort, 0 = unknown)
+```
+Decoders must accept both forms and must not reject a beacon because it has no
+location. `SOS_FLAG_HAS_LOCATION = 0x01`, `MAX_SOS_TEXT = 128`.
+
 ---
 
 ## 3. Direct-message encryption (ECIES)
@@ -112,7 +128,7 @@ Every node keeps:
 * **Peer table**: `nodeId → (publicKey, name, lastSeen, lastHopCount)`.
 * **Seen cache**: `messageId → firstSeenAt`, bounded (default 5 000 entries / 24 h).
 * **Relay store**: recently forwarded/originated packets `messageId → (bytes,
-  expiresAt, deliveredToPeers)`, bounded (default 500 entries / 24 h).
+  expiresAt, deliveredToPeers)`, bounded (default 500 entries / **72 h**).
 * **Links**: currently connected BLE links, each tagged with the peer's `nodeId`
   once it has been learned.
 
@@ -142,6 +158,20 @@ On a **new link** becoming ready:
 
 Originating: build packet with `ttl = MAX_TTL`, sign, add to seen cache and
 relay store, send on all links.
+
+### 4.1 SOS beacons
+
+SOS (type 4) packets are treated as broadcast traffic with two exceptions:
+
+* they are **always relayed**, even by power-saver relays (see §7);
+* any received beacon is surfaced to the app (and to the operator's responder
+  notification) at every hop, exactly once per node via the seen cache.
+
+### 4.2 Store-and-forward retention
+
+The relay store keeps packets for **72 h** (`RELAY_TTL`), so a beacon or message
+can cross a gap in the mesh that opens and closes days later. Relayed packets are
+replayed to a peer when it (re)connects (step 2 of the new-link procedure above).
 
 ---
 
@@ -188,5 +218,38 @@ streams are discarded after 10 s. A single-fragment packet still carries the
 | `MAX_NAME_BYTES`  | 64                   |
 | `HKDF_INFO`       | `"ripple/v1/msg"`    |
 | `SEEN_TTL`        | 24 h                 |
-| `RELAY_TTL`       | 24 h                 |
+| `RELAY_TTL`       | 72 h                 |   (store-and-forward window)
 | `REASSEMBLY_TTL`  | 10 s                 |
+| `MAX_SOS_TEXT`    | 128 bytes            |
+| `SOS_FLAG_HAS_LOCATION` | 0x01         |
+
+---
+
+## 7. Rate limiting & battery profiles
+
+### 7.1 Per-source flood cap
+
+To stop a single node from flooding the mesh, a receiver may enforce a sliding-window
+budget per source on **broadcast** MESSAGE and SOS traffic (direct, end-to-end
+messages are never gated). When the budget is spent the receiver drops the packet —
+it is neither delivered nor relayed. Configurable; disabled by default so the
+behaviour in §4 is unchanged unless an operator opts in.
+
+### 7.2 Battery profiles
+
+Each node runs one of three battery profiles, which controls how aggressively it
+forwards other nodes' traffic:
+
+| Profile        | code | Relays ordinary chat | Relays SOS/ANNOUNCE |
+|----------------|------|----------------------|---------------------|
+| `PERFORMANCE`  | 0    | yes                  | yes                 |
+| `BALANCED`     | 1    | yes                  | yes                 |
+| `POWER_SAVER`  | 2    | no                   | yes                 |
+
+A power-saver node is a *leaf* for chat (it still receives and delivers traffic
+addressed to it) but continues to propagate liveness (ANNOUNCE) and safety (SOS)
+traffic. This is a local policy; it changes no bytes on the wire. On the BLE
+transport the profile can also widen the advertise/scan duty cycle to save battery.
+The profile is orthogonal to the 72 h retention guarantee: a node still relays what
+it has already received for up to 72 h, it simply chooses not to receive-and-forward
+new ordinary chat while in power-saver.

@@ -102,6 +102,27 @@ const ack = stable('ack', R.buildPacket(bob, {
 }), bob);
 vectors.ack = { unsignedBytes: hex(R.encodeUnsigned(ack)), fullPacket: hex(R.encode(ack)) };
 
+// --- sos beacon (Phase 2)
+const sosLocation = { latE7: 285430001, lngE7: -7709002, accuracyMeters: 15 };
+const sosPayload = R.encodeSos({ text: 'Need help at the north gate', location: sosLocation });
+const sos = stable('sos', R.buildPacket(alice, {
+  type: R.PacketType.SOS, ttl: 7,
+  messageId: Buffer.from('e0e1e2e3e4e5e6e7e8e9eaebecedeeef', 'hex'),
+  timestamp: 1_757_000_004_000n, payload: sosPayload,
+}), alice);
+vectors.sos = {
+  text: 'Need help at the north gate',
+  location: { latE7: sosLocation.latE7, lngE7: sosLocation.lngE7, accuracyMeters: sosLocation.accuracyMeters },
+  payload: hex(sosPayload),
+  // A beacon that does NOT opt in to GPS: location stays off the wire entirely.
+  noLocationPayload: hex(R.encodeSos({ text: 'no gps' })),
+  noLocationText: 'no gps',
+  unsignedBytes: hex(R.encodeUnsigned(sos)),
+  signingDigest: hex(R.signingDigest(R.encodeUnsigned(sos))),
+  fullPacket: hex(R.encode(sos)),
+  decoded: { type: 4, flags: 0, ttl: 7, messageId: hex(sos.messageId), source: hex(sos.source), destination: hex(sos.destination), timestamp: sos.timestamp.toString(), payloadLength: sosPayload.length },
+};
+
 // --- fragmentation
 const big = Buffer.alloc(1000); for (let i = 0; i < big.length; i++) big[i] = i & 0xff;
 vectors.fragmentation = {

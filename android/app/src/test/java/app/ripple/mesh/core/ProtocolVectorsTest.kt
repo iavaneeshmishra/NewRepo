@@ -4,6 +4,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -147,5 +148,53 @@ class ProtocolVectorsTest {
         }
         val tampered = Packet.decode(bad.getString("tamperedPayload").hexToBytes())
         assertFalse(Crypto.verify(alice.publicKey, tampered.encodeUnsigned(), tampered.signature))
+    }
+
+    // ---- Phase 2: SOS beacon payload (PROTOCOL.md §2.2) --------------------------------
+
+    @Test fun `sos beacon with opted-in gps encodes identically to the vector`() {
+        val s = v.getJSONObject("sos")
+        val loc = s.getJSONObject("location")
+        val payload = SosCodec.encode(s.getString("text"), SosLocation(loc.getInt("latE7"), loc.getInt("lngE7"), loc.getInt("accuracyMeters")))
+        assertEquals(s.getString("payload"), payload.toHex())
+        val dec = SosCodec.decode(payload)
+        assertEquals(s.getString("text"), dec.text)
+        assertEquals(loc.getInt("latE7"), dec.location!!.latE7)
+        assertEquals(loc.getInt("lngE7"), dec.location!!.lngE7)   // negative longitude round-trips
+        assertEquals(loc.getInt("accuracyMeters"), dec.location!!.accuracyMeters)
+    }
+
+    @Test fun `sos beacon without gps omits the location bytes entirely`() {
+        val s = v.getJSONObject("sos")
+        val payload = SosCodec.encode(s.getString("noLocationText"), null)
+        assertEquals(s.getString("noLocationPayload"), payload.toHex())
+        val dec = SosCodec.decode(payload)
+        assertEquals(s.getString("noLocationText"), dec.text)
+        assertNull(dec.location)
+    }
+
+    @Test fun `sos beacon packet is type SOS, broadcast, and verifies`() {
+        val s = v.getJSONObject("sos")
+        val full = Packet.decode(s.getString("fullPacket").hexToBytes())
+        assertEquals(PacketType.SOS, full.type)
+        assertEquals(4, full.type.code)
+        assertTrue(full.destination.isBroadcast)
+        assertEquals(s.getString("signingDigest"), full.signingDigest().toHex())
+        assertTrue(Crypto.verify(alice.publicKey, full.encodeUnsigned(), full.signature))
+        val dec = SosCodec.decode(full.payload)
+        assertEquals(s.getString("text"), dec.text)
+        assertEquals(s.getJSONObject("location").getInt("latE7"), dec.location!!.latE7)
+    }
+
+    @Test fun `sos beacon decoded header matches the vector`() {
+        val s = v.getJSONObject("sos")
+        val d = s.getJSONObject("decoded")
+        val full = Packet.decode(s.getString("fullPacket").hexToBytes())
+        assertEquals(d.getInt("type"), full.type.code)
+        assertEquals(d.getInt("ttl"), full.ttl)
+        assertEquals(d.getString("messageId"), full.messageIdHex)
+        assertEquals(d.getString("source"), full.source.hex)
+        assertEquals(d.getInt("payloadLength"), full.payload.size)
+        assertEquals(s.getString("payload"), full.payload.toHex())
     }
 }
