@@ -1,9 +1,12 @@
 # Ripple beta program
 
+> **v1.0.0 is released.**  The beta program for v1 is closed.  Watch the
+> repository (Custom → Releases) to be notified when v2 betas open.
+
 Ripple works without the internet — but it only gets *reliable* by running on
 real phones.  Beta testers are the people who make that happen.
 
-## How to join
+## How to join (next beta cycle)
 
 1. **Watch this repository** (click "Watch → Custom → Releases" at minimum).
 2. When a beta tag appears (`v1.0.0-beta.N`), download the build:

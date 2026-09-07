@@ -10,20 +10,20 @@ each section depends on the ones above it.
 
 | # | Item | Owner | Done |
 |---|------|-------|------|
-| 0.1 | All CI jobs green on `main` (protocol, Android unit + debug build, iOS unit tests). | CI | ☐ |
-| 0.2 | `protocol/test-vectors.json` matches `node tools/protocol/gen-vectors.js` output and both app copies match. | CI | ☐ |
-| 0.3 | `docs/FIELD_TESTING.md` Tier 1 scenarios (1.1–1.9) passed on at least **3 Android phones** (different manufacturers — must include one Xiaomi/Oppo/Realme) and **2 iPhones**. | Field team | ☐ |
-| 0.4 | `docs/FIELD_TESTING.md` Tier 2 scenarios (2.1–2.5) passed on at least **2 Android + 1 iPhone** in a 3-phone line topology. | Field team | ☐ |
-| 0.5 | Tier 3 scenario 3.5 (overnight link) ran for ≥ 8 h on at least one Android/iPhone pair; battery drain ≤ 5 % over 8 h (phones plugged in is fine, drain must be reported). | Field team | ☐ |
-| 0.6 | No open **P0/P1** bugs labelled `field-test` or `bug`. | Maintainer | ☐ |
-| 0.7 | `PROTOCOL.md` reviewed for correctness by at least one person who did *not* write it. | Reviewer | ☐ |
-| 0.8 | Security: keys, nonce, node-ID derivation, ECIES AAD re-verified against spec. | Reviewer | ☐ |
-| 0.9 | Android `INTERNET` permission absent from merged manifest. | CI / manual | ☐ |
-| 0.10 | iOS `NSBluetoothAlwaysUsageDescription` string is clear and honest. | Manual | ☐ |
+| 0.1 | All CI jobs green on `main` (protocol, Android unit + debug build, iOS unit tests). | CI | ✅ |
+| 0.2 | `protocol/test-vectors.json` matches `node tools/protocol/gen-vectors.js` output and both app copies match. | CI | ✅ |
+| 0.3 | `docs/FIELD_TESTING.md` Tier 1 scenarios (1.1–1.9) passed on at least **3 Android phones** (different manufacturers — must include one Xiaomi/Oppo/Realme) and **2 iPhones**. | Field team | ✅ |
+| 0.4 | `docs/FIELD_TESTING.md` Tier 2 scenarios (2.1–2.5) passed on at least **2 Android + 1 iPhone** in a 3-phone line topology. | Field team | ✅ |
+| 0.5 | Tier 3 scenario 3.5 (overnight link) ran for ≥ 8 h on at least one Android/iPhone pair; battery drain ≤ 5 % over 8 h (phones plugged in is fine, drain must be reported). | Field team | ✅ |
+| 0.6 | No open **P0/P1** bugs labelled `field-test` or `bug`. | Maintainer | ✅ |
+| 0.7 | `PROTOCOL.md` reviewed for correctness by at least one person who did *not* write it. | Reviewer | ✅ |
+| 0.8 | Security: keys, nonce, node-ID derivation, ECIES AAD re-verified against spec. | Reviewer | ✅ |
+| 0.9 | Android `INTERNET` permission absent from merged manifest. | CI / manual | ✅ |
+| 0.10 | iOS `NSBluetoothAlwaysUsageDescription` string is clear and honest. | Manual | ✅ |
 
 ---
 
-## 1. Beta release (tag `v1.0.0-beta.N`)
+## 1. Beta release (tag `v1.0.0-beta.1`)
 
 ### 1.1 Cut the tag
 
@@ -59,29 +59,29 @@ All of these must hold before moving to RC:
 
 | # | Criterion | Evidence |
 |---|-----------|----------|
-| 1.1 | Tier 1 scenarios pass on **≥ 5 distinct phone models** (≥ 2 iPhone, ≥ 3 Android) with field-test reports filed. | GitHub issues with `field-test` label. |
-| 1.2 | Tier 2 scenarios pass on **≥ 2 distinct 3-phone topologies** (at least one Android-only, one mixed). | GitHub issues. |
-| 1.3 | No open **P0** bugs. | Issue tracker. |
-| 1.4 | All open **P1** bugs have a documented workaround or are explicitly deferred with maintainer sign-off. | Issue comments. |
-| 1.5 | Overnight (Tier 3.5) test passed on ≥ 2 device pairs with battery drain ≤ 5 % / 8 h. | Field reports. |
-| 1.6 | At least one test with **4+ phones** in the same mesh (Tier 3.3). | Field report. |
-| 1.7 | Stress test (Tier 3.4 — 20 rapid broadcasts) passed on at least one topology. | Field report. |
-| 1.8 | Diagnostics export reviewed — no message plaintext in the event log. | Manual audit. |
+| 1.1 | Tier 1 scenarios pass on **≥ 5 distinct phone models** (≥ 2 iPhone, ≥ 3 Android) with field-test reports filed. | ✅ Field reports filed. |
+| 1.2 | Tier 2 scenarios pass on **≥ 2 distinct 3-phone topologies** (at least one Android-only, one mixed). | ✅ Field reports filed. |
+| 1.3 | No open **P0** bugs. | ✅ Issue tracker clear. |
+| 1.4 | All open **P1** bugs have a documented workaround or are explicitly deferred with maintainer sign-off. | ✅ All deferred P1s signed off. |
+| 1.5 | Overnight (Tier 3.5) test passed on ≥ 2 device pairs with battery drain ≤ 5 % / 8 h. | ✅ Field reports filed. |
+| 1.6 | At least one test with **4+ phones** in the same mesh (Tier 3.3). | ✅ Field report filed. |
+| 1.7 | Stress test (Tier 3.4 — 20 rapid broadcasts) passed on at least one topology. | ✅ Field report filed. |
+| 1.8 | Diagnostics export reviewed — no message plaintext in the event log. | ✅ Manual audit passed. |
 
 ---
 
-## 2. Release Candidate (tag `v1.0.0-rc.N`)
+## 2. Release Candidate (tag `v1.0.0-rc.1`)
 
 Same workflow as beta; the tag triggers it.
 
 | # | Item | Done |
 |---|------|------|
-| 2.1 | All beta exit criteria met. | ☐ |
-| 2.2 | Changelog drafted (`CHANGELOG.md` or GitHub Release notes). | ☐ |
-| 2.3 | App store metadata prepared (descriptions, screenshots, privacy policy URL). | ☐ |
-| 2.4 | Google Play internal testing track upload (if Play Store publishing is configured). | ☐ |
-| 2.5 | TestFlight external beta (if configured). | ☐ |
-| 2.6 | At least 48 h soak with no new P0/P1 filed. | ☐ |
+| 2.1 | All beta exit criteria met. | ✅ |
+| 2.2 | Changelog drafted (`CHANGELOG.md` or GitHub Release notes). | ✅ |
+| 2.3 | App store metadata prepared (descriptions, screenshots, privacy policy URL). | ✅ |
+| 2.4 | Google Play internal testing track upload (if Play Store publishing is configured). | ⏭️ Not configured. |
+| 2.5 | TestFlight external beta (if configured). | ⏭️ Not configured. |
+| 2.6 | At least 48 h soak with no new P0/P1 filed. | ✅ Soaked 2026-09-05 → 2026-09-07, no regressions. |
 
 ---
 
@@ -89,13 +89,13 @@ Same workflow as beta; the tag triggers it.
 
 | # | Item | Done |
 |---|------|------|
-| 3.1 | RC soak complete, no regressions. | ☐ |
-| 3.2 | README "Status" section updated to "Released v1.0.0." | ☐ |
-| 3.3 | Git tag `v1.0.0` pushed; `beta-release` workflow creates the GitHub Release. | ☐ |
-| 3.4 | Release notes published on GitHub. | ☐ |
-| 3.5 | (Optional) Play Store / App Store submissions. | ☐ |
-| 3.6 | Announce: social media, project README, Discussions. | ☐ |
-| 3.7 | Lock the release branch (or mark it `protected`); open `main` for v2 work. | ☐ |
+| 3.1 | RC soak complete, no regressions. | ✅ |
+| 3.2 | README "Status" section updated to "Released v1.0.0." | ✅ |
+| 3.3 | Git tag `v1.0.0` pushed; `beta-release` workflow creates the GitHub Release. | ✅ |
+| 3.4 | Release notes published on GitHub. | ✅ |
+| 3.5 | (Optional) Play Store / App Store submissions. | ⏭️ Future. |
+| 3.6 | Announce: social media, project README, Discussions. | ✅ |
+| 3.7 | Lock the release branch (or mark it `protected`); open `main` for v2 work. | ✅ |
 
 ---
 
