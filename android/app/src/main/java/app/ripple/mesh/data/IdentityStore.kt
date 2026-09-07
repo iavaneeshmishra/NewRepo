@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.ripple.mesh.core.Identity
@@ -29,6 +30,7 @@ object IdentityStore {
     private const val ALIAS = "ripple-identity-v1"
     private val NAME = stringPreferencesKey("display_name")
     private val SOFT_KEY = stringPreferencesKey("soft_identity_pkcs8")
+    private val POWER_PROFILE = intPreferencesKey("power_profile")
 
     fun load(context: Context): Identity =
         if (android.os.Build.VERSION.SDK_INT >= 31) loadKeystore() else loadSoftware(context)
@@ -67,5 +69,12 @@ object IdentityStore {
 
     suspend fun setDisplayName(context: Context, name: String) {
         context.settings.edit { it[NAME] = name }
+    }
+
+    /** Battery profile persists across restarts (DataStore). */
+    fun powerProfile(context: Context): Flow<Int?> = context.settings.data.map { it[POWER_PROFILE] }
+
+    suspend fun setPowerProfile(context: Context, code: Int) {
+        context.settings.edit { it[POWER_PROFILE] = code }
     }
 }

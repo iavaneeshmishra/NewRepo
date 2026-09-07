@@ -42,6 +42,7 @@ import app.ripple.mesh.data.MessageStatus
 import app.ripple.mesh.data.PeerEntity
 import app.ripple.mesh.data.RelayPacketEntity
 import app.ripple.mesh.data.RippleDatabase
+import app.ripple.mesh.data.SosBeaconEntity
 import app.ripple.mesh.ui.MainActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -114,7 +115,13 @@ class MeshService : LifecycleService(), RouterListener {
 
         lifecycleScope.launch {
             IdentityStore.displayName(this@MeshService).first()?.let { router.setDisplayName(it) }
-            // Restore state.
+            // Restore the persisted power profile, then rebuild in-memory state.
+            IdentityStore.powerProfile(this@MeshService).first()?.let { code ->
+                if (BatteryProfile.isValid(code)) {
+                    runCatching { router.setBatteryProfile(code) }
+                    _powerProfile.value = code
+                }
+            }
             val savedPeers = withContext(Dispatchers.IO) { db.peers().all() }
             router.importPeers(savedPeers.mapNotNull { e ->
                 runCatching { Peer(NodeId.fromHex(e.nodeId), Crypto.publicKeyFromWire(e.publicKeyWire), e.publicKeyWire, e.name, e.lastSeen, e.hops) }.getOrNull()
@@ -129,11 +136,13 @@ class MeshService : LifecycleService(), RouterListener {
 
         registerReceiver(btStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
-        // Periodic housekeeping: persist relay store, refresh notification, poke scanner.
+        // Periodic housekeeping: persist relay store, prune old SOS history, refresh notification, poke scanner.
         lifecycleScope.launch {
             while (true) {
                 delay(30_000)
                 persistRelayStore()
+                val cutoff = System.currentTimeMillis() - RippleDatabase.SOS_RETENTION_MS
+                withContext(Dispatchers.IO) { db.sos().prune(cutoff) }
                 central?.startScanning()
                 updateNotification()
             }
@@ -206,6 +215,18 @@ class MeshService : LifecycleService(), RouterListener {
 
     override fun onSos(beacon: SosBeacon) {
         recentSos = beacon
+        val entity = SosBeaconEntity(
+            messageId = beacon.messageId.toHex(),
+            fromNodeId = beacon.from.hex,
+            fromName = beacon.fromName,
+            text = beacon.text,
+            latE7 = beacon.location?.latE7,
+            lngE7 = beacon.location?.lngE7,
+            accuracyMeters = beacon.location?.accuracyMeters,
+            verified = beacon.verified,
+            timestamp = beacon.timestamp,
+        )
+        lifecycleScope.launch(Dispatchers.IO) { db.sos().upsert(entity) }
         val title = "SOS — ${beacon.fromName ?: beacon.from.display}"
         val body = if (beacon.text.isEmpty()) "An SOS beacon is active nearby." else beacon.text
         val n = NotificationCompat.Builder(this, CHANNEL_MESSAGES)
@@ -220,6 +241,7 @@ class MeshService : LifecycleService(), RouterListener {
     fun setPowerProfile(code: Int) {
         runCatching { router.setBatteryProfile(code) }
         _powerProfile.value = if (BatteryProfile.isValid(code)) code else BatteryProfile.BALANCED
+        lifecycleScope.launch(Dispatchers.IO) { IdentityStore.setPowerProfile(this@MeshService, _powerProfile.value) }
         Log.i(TAG, "power profile -> $code")
     }
 

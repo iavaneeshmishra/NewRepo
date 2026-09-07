@@ -11,6 +11,7 @@ enum IdentityStore {
     private static let service = "app.ripple.mesh"
     private static let account = "identity-v1"
     private static let nameKey = "displayName"
+    private static let powerProfileKey = "powerProfile"
 
     static func load() -> Identity {
         if let raw = readKeychain(), let id = try? Identity(rawScalar: raw) { return id }
@@ -22,6 +23,12 @@ enum IdentityStore {
     static var displayName: String? {
         get { UserDefaults.standard.string(forKey: nameKey) }
         set { UserDefaults.standard.set(newValue, forKey: nameKey) }
+    }
+
+    /// Battery profile persists across restarts (UserDefaults).
+    static var powerProfile: Int? {
+        get { UserDefaults.standard.object(forKey: powerProfileKey) as? Int }
+        set { UserDefaults.standard.set(newValue, forKey: powerProfileKey) }
     }
 
     private static func query() -> [String: Any] {

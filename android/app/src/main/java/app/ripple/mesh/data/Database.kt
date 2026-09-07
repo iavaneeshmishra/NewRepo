@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 enum class MessageStatus { PENDING, SENT, DELIVERED, RECEIVED, FAILED }
@@ -46,6 +48,20 @@ data class RelayPacketEntity(
     @PrimaryKey val messageId: String,
     val bytes: ByteArray,
     val expiresAt: Long,
+)
+
+/** Received SOS beacon history (PROTOCOL.md §2.2), retained for ~90 days. */
+@Entity(tableName = "sos_beacons")
+data class SosBeaconEntity(
+    @PrimaryKey val messageId: String,           // hex
+    val fromNodeId: String,                      // hex
+    val fromName: String?,
+    val text: String,
+    val latE7: Int?,
+    val lngE7: Int?,
+    val accuracyMeters: Int?,
+    val verified: Boolean,
+    val timestamp: Long,
 )
 
 data class ConversationSummary(val conversation: String, val lastText: String, val lastTimestamp: Long, val unread: Int)
@@ -104,16 +120,52 @@ interface RelayDao {
     suspend fun purge(now: Long)
 }
 
-@Database(entities = [MessageEntity::class, PeerEntity::class, RelayPacketEntity::class], version = 1, exportSchema = false)
+@Dao
+interface SosBeaconDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(beacon: SosBeaconEntity)
+
+    @Query("SELECT * FROM sos_beacons ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<SosBeaconEntity>>
+
+    @Query("DELETE FROM sos_beacons WHERE timestamp < :cutoff")
+    suspend fun prune(cutoff: Long)
+}
+
+/** v1 → v2: add the `sos_beacons` history table. */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `sos_beacons` (" +
+                "`messageId` TEXT NOT NULL, " +
+                "`fromNodeId` TEXT NOT NULL, " +
+                "`fromName` TEXT, " +
+                "`text` TEXT NOT NULL, " +
+                "`latE7` INTEGER, " +
+                "`lngE7` INTEGER, " +
+                "`accuracyMeters` INTEGER, " +
+                "`verified` INTEGER NOT NULL, " +
+                "`timestamp` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`messageId`))"
+        )
+    }
+}
+
+@Database(entities = [MessageEntity::class, PeerEntity::class, RelayPacketEntity::class, SosBeaconEntity::class], version = 2, exportSchema = false)
 abstract class RippleDatabase : RoomDatabase() {
     abstract fun messages(): MessageDao
     abstract fun peers(): PeerDao
     abstract fun relay(): RelayDao
+    abstract fun sos(): SosBeaconDao
 
     companion object {
+        /** Received SOS beacons are retained for ~90 days before being pruned. */
+        const val SOS_RETENTION_MS = 90L * 24 * 3600 * 1000
+
         @Volatile private var instance: RippleDatabase? = null
         fun get(context: Context): RippleDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, RippleDatabase::class.java, "ripple.db")
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration().build().also { instance = it }
         }
     }

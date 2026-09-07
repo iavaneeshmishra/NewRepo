@@ -15,6 +15,7 @@ import app.ripple.mesh.data.IdentityStore
 import app.ripple.mesh.data.MessageEntity
 import app.ripple.mesh.data.PeerEntity
 import app.ripple.mesh.data.RippleDatabase
+import app.ripple.mesh.data.SosBeaconEntity
 import app.ripple.mesh.service.MeshService
 import app.ripple.mesh.service.MeshStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,6 +49,10 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val peers: StateFlow<List<PeerEntity>> = db.peers().observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Received SOS beacon history (persisted in Room, pruned to ~90 days). */
+    val sosBeacons: StateFlow<List<SosBeaconEntity>> = db.sos().observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun messages(conversation: String): Flow<List<MessageEntity>> = db.messages().observeConversation(conversation)
