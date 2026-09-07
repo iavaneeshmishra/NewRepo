@@ -1,0 +1,58 @@
+name: Beta feedback
+description: Quick feedback from a beta tester (use Field test report for full scenario results)
+title: "[beta] "
+labels: ["beta", "feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying the Ripple beta!  For full scenario results with
+        diagnostics, use the **Field test report** template instead.
+        This form is for quick reactions, one-off issues, or UX feedback.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Android, iOS, Both]
+    validations: { required: true }
+
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: Commit hash, APK/TestFlight build number, or tag
+    validations: { required: true }
+
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: Pixel 7, Android 14 / iPhone 13, iOS 17.5
+
+  - type: textarea
+    id: feedback
+    attributes:
+      label: What happened?
+      description: |
+        What worked, what didn't, what confused you?  Include steps to
+        reproduce if it's a bug.
+    validations: { required: true }
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How bad is it?
+      options:
+        - "Can't use the app (crash, data loss, security concern)"
+        - "Feature is broken in a common scenario"
+        - "Edge case or cosmetic issue"
+        - "Suggestion / nice-to-have"
+    validations: { required: true }
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics export (optional)
+      description: Settings → Diagnostics → share icon.  Paste or attach.
+      render: text
