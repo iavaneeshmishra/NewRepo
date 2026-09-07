@@ -16,6 +16,7 @@ import app.ripple.mesh.data.MessageEntity
 import app.ripple.mesh.data.PeerEntity
 import app.ripple.mesh.data.RippleDatabase
 import app.ripple.mesh.data.SosBeaconEntity
+import app.ripple.mesh.service.LinkInfo
 import app.ripple.mesh.service.MeshService
 import app.ripple.mesh.service.MeshStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -84,6 +85,11 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowerProfile(code: Int) = viewModelScope.launch { service.value?.setPowerProfile(code) }
 
     fun sendSos(text: String, shareLocation: Boolean) = viewModelScope.launch { service.value?.sendSos(text, shareLocation) }
+
+    // Diagnostics
+    fun linkInfos(): List<LinkInfo> = service.value?.linkInfos() ?: emptyList()
+    fun diagnosticsHeader(): String = service.value?.diagnosticsHeader() ?: "Ripple diagnostics (service not bound)"
+    fun setLoopback(enabled: Boolean) { service.value?.setLoopback(enabled) }
 
     override fun onCleared() {
         runCatching { getApplication<Application>().unbindService(connection) }

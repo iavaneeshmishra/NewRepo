@@ -96,8 +96,13 @@ struct HomeView: View {
     private var peerList: some View {
         Group {
             if peers.isEmpty {
-                ContentUnavailableView("No peers yet", systemImage: "dot.radiowaves.left.and.right",
-                                       description: Text("Keep Bluetooth on and bring another phone running Ripple within range."))
+                ContentUnavailableView {
+                    Label("No peers yet", systemImage: "dot.radiowaves.left.and.right")
+                } description: {
+                    Text("Keep Bluetooth on and bring another phone running Ripple within range.")
+                } actions: {
+                    Button("Only one phone? Try the simulated neighbourhood") { showSettings = true }
+                }
             } else {
                 List(peers) { p in
                     NavigationLink(value: p.nodeId) {

@@ -16,6 +16,9 @@ final class BleCentral: NSObject {
     private let txUUID = CBUUID(string: MeshProtocol.txUUID)
 
     private var links: [UUID: CentralLink] = [:]
+    private let log = EventLog.global
+    func allLinks() -> [BleLink] { queue.sync { Array(links.values) } }
+    func refreshRssi() { queue.async { [self] in links.values.forEach { $0.peripheral.readRSSI() } } }
     private var recentlyFailed: [UUID: Date] = [:]
     private(set) var isScanning = false
 
@@ -40,7 +43,7 @@ final class BleCentral: NSObject {
             guard manager.state == .poweredOn, !isScanning else { return }
             manager.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
             isScanning = true
-            Self.log.info("scanning")
+            Self.log.info("scanning"); log.i("central", "scanning for mesh service")
         }
     }
 
@@ -58,17 +61,18 @@ final class BleCentral: NSObject {
 
     var linkCount: Int { links.count }
 
-    private func consider(_ peripheral: CBPeripheral) {
+    private func consider(_ peripheral: CBPeripheral, rssi: Int) {
         let id = peripheral.identifier
         guard links[id] == nil, links.count < maxOutgoing, !shouldSkip(peripheral) else { return }
         if let failedAt = recentlyFailed[id], Date().timeIntervalSince(failedAt) < reconnectBackoff { return }
         let link = CentralLink(peripheral: peripheral, central: self)
+        link.rssi = rssi
         links[id] = link
-        Self.log.info("connecting to \(id)")
+        Self.log.info("connecting to \(id)"); log.i("central", "connecting → \(id.uuidString.prefix(8)) (rssi \(link.rssi.map(String.init) ?? "?"))")
         manager.connect(peripheral, options: nil)
         queue.asyncAfter(deadline: .now() + 20) { [weak self, weak link] in
             guard let self, let link, !link.ready, !link.isClosed else { return }
-            Self.log.warning("\(link.id) setup timeout")
+            Self.log.warning("\(link.id) setup timeout"); self.log.w("central", "\(link.id) setup timeout")
             self.fail(link)
         }
     }
@@ -124,7 +128,8 @@ extension BleCentral: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        consider(peripheral)
+        links[peripheral.identifier]?.rssi = RSSI.intValue
+        consider(peripheral, rssi: RSSI.intValue)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -140,6 +145,7 @@ extension BleCentral: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         if let link = links[peripheral.identifier] {
+            log.i("central", "\(link.id) disconnected\(error.map { ": \($0.localizedDescription)" } ?? "")")
             if !link.ready { recentlyFailed[peripheral.identifier] = Date() }
             link.close()
         }
@@ -149,7 +155,7 @@ extension BleCentral: CBCentralManagerDelegate {
 extension BleCentral: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard let link = links[peripheral.identifier] else { return }
-        guard error == nil, let service = peripheral.services?.first(where: { $0.uuid == serviceUUID }) else { fail(link); return }
+        guard error == nil, let service = peripheral.services?.first(where: { $0.uuid == serviceUUID }) else { log.w("central", "\(link.id) service discovery failed"); fail(link); return }
         peripheral.discoverCharacteristics([rxUUID, txUUID], for: service)
     }
 
@@ -165,13 +171,18 @@ extension BleCentral: CBPeripheralDelegate {
         guard let link = links[peripheral.identifier] else { return }
         guard error == nil, characteristic.isNotifying else { fail(link); return }
         link.ready = true
-        Self.log.info("\(link.id) ready, frame=\(link.frameSize)")
+        Self.log.info("\(link.id) ready, frame=\(link.frameSize)"); log.i("central", "\(link.id) ready, frame \(link.frameSize) B")
+        peripheral.readRSSI()
         onLinkReady(link)
     }
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard characteristic.uuid == txUUID, let value = characteristic.value, let link = links[peripheral.identifier] else { return }
         link.onFrame(value)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
+        if error == nil { links[peripheral.identifier]?.rssi = RSSI.intValue }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {

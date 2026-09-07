@@ -3,6 +3,7 @@ import Combine
 import CoreBluetooth
 import SwiftData
 import UserNotifications
+import UIKit
 import os
 
 struct MeshStatus: Equatable {
@@ -10,6 +11,19 @@ struct MeshStatus: Equatable {
     var advertising = false
     var directLinks = 0
     var knownPeers = 0
+    var loopback = false
+}
+
+/// Snapshot of one link for the Diagnostics screen.
+struct LinkInfo: Identifiable {
+    let id: String
+    let role: String            // "central" / "peripheral" / "sim"
+    let peerName: String?
+    let peerShort: String?
+    let rssi: Int?
+    let frameSize: Int
+    let bytesIn: Int, bytesOut: Int, packetsIn: Int, packetsOut: Int
+    let age: TimeInterval
 }
 
 /// App-lifetime owner of the `MeshRouter` and both BLE roles. Persists inbound
@@ -29,6 +43,8 @@ final class MeshService: ObservableObject, RouterListener {
     private var central: BleCentral!
     private var peripheral: BlePeripheral!
     private var housekeeping: Timer?
+    private var loopback: Loopback?
+    let eventLog = EventLog.global
 
     /// Conversation currently on screen; suppresses its notifications.
     var visibleConversation: String?
@@ -41,6 +57,7 @@ final class MeshService: ObservableObject, RouterListener {
         router = MeshRouter(identity: identity, displayName: name, listener: nil)
         router.listener = self
         Self.log.info("identity \(identity.nodeId.display)")
+        eventLog.i("service", "started; node \(identity.nodeId.display); iOS \(UIDevice.current.systemVersion); \(UIDevice.current.model)")
 
         // Restore the persisted power profile before rebuilding in-memory state.
         if let code = IdentityStore.powerProfile, let profile = BatteryProfile(rawValue: code) {
@@ -68,6 +85,7 @@ final class MeshService: ObservableObject, RouterListener {
                 self.persistRelayStore()
                 self.pruneSosHistory()
                 self.central.startScanning()
+                self.central.refreshRssi()
             }
         }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
@@ -194,6 +212,42 @@ final class MeshService: ObservableObject, RouterListener {
             content.threadIdentifier = "sos"
             UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: beacon.messageId.hex, content: content, trigger: nil))
         }
+    }
+
+    // MARK: Diagnostics
+
+    func linkInfos() -> [LinkInfo] {
+        func info(_ l: BleLink, _ role: String) -> LinkInfo {
+            let peer = l.peerHex.flatMap { NodeId(hex: $0) }.flatMap { router.peer($0) }
+            return LinkInfo(id: l.id, role: role, peerName: peer?.name, peerShort: l.peerHex.map { String($0.suffix(4)) }, rssi: l.rssi, frameSize: l.frameSize,
+                            bytesIn: l.bytesIn, bytesOut: l.bytesOut, packetsIn: l.packetsIn, packetsOut: l.packetsOut, age: Date().timeIntervalSince(l.openedAt))
+        }
+        var out = central.allLinks().map { info($0, "central") } + peripheral.allLinks().map { info($0, "peripheral") }
+        if loopback?.isRunning == true {
+            for s in router.linkSnapshots() where s.id.hasPrefix("sim:") {
+                let peer = s.peerHex.flatMap { NodeId(hex: $0) }.flatMap { router.peer($0) }
+                out.append(LinkInfo(id: s.id, role: "sim", peerName: peer?.name, peerShort: s.peerHex.map { String($0.suffix(4)) }, rssi: nil, frameSize: 0, bytesIn: 0, bytesOut: 0, packetsIn: 0, packetsOut: 0, age: 0))
+            }
+        }
+        return out
+    }
+
+    func setLoopback(_ enabled: Bool) {
+        if enabled, loopback == nil { let l = Loopback(local: router); loopback = l; l.start() }
+        else if !enabled { loopback?.stop(); loopback = nil }
+        status.loopback = enabled
+        refreshStatus()
+    }
+
+    func diagnosticsHeader() -> String {
+        var s = "Ripple diagnostics\n"
+        s += "node: \(router.selfId.display)  name: \(displayName)\n"
+        s += "device: \(UIDevice.current.model)  iOS \(UIDevice.current.systemVersion)\n"
+        s += "bluetooth: \(status.bluetoothOn ? "on" : "off")  advertising: \(peripheral.isAdvertising)  loopback: \(loopback?.isRunning ?? false)\n"
+        s += "links: \(router.linkCount())  identified: \(router.directNeighbourCount())  peers known: \(router.allPeers().count)  relay store: \(router.relayStoreSnapshot().count)\n"
+        for l in linkInfos() { s += "  \(l.id) [\(l.role)] peer=\(l.peerName ?? l.peerShort ?? "?") rssi=\(l.rssi.map(String.init) ?? "?") frame=\(l.frameSize) in=\(l.packetsIn)p/\(l.bytesIn)B out=\(l.packetsOut)p/\(l.bytesOut)B\n" }
+        for p in router.allPeers() { s += "  peer \(p.name) (\(p.nodeId.short)) hops=\(p.hops) seen=\(EventLog.formatTime(p.lastSeen))\n" }
+        return s
     }
 
     // MARK: API for the UI

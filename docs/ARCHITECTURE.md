@@ -87,6 +87,22 @@ so the platforms cannot drift apart.
   secrecy across messages beyond per-message ephemeral keys; no replay protection
   beyond the 24 h seen cache; metadata (who talks to whom) is visible to relays.
 
+## Diagnostics and the simulated neighbourhood
+
+`core/EventLog` is a bounded ring buffer that the BLE layers and router write to
+(never message plaintext). The Diagnostics screen shows it live along with a
+per-link table (role, peer, RSSI, frame size, bytes/packets in/out, age) and can
+export everything as text via the platform share sheet — that export is what bug
+reports should contain.
+
+`core/Loopback` builds an in-process neighbourhood: two extra `MeshRouter`s ("Asha",
+"Ravi") joined to the local router by latency-adding in-memory `Link`s in a line
+`you — Asha — Ravi`. Because they are *real* routers, everything is exercised —
+announces, hop counting, ECIES, ACKs, TTL decrement, and store-and-forward when Ravi
+periodically "walks out of range". It runs alongside real BLE links, so a phone with
+loopback enabled will also relay for simulated peers; that is intentional for demos
+but the toggle should stay off in real deployments.
+
 ## Platform notes
 
 **Android**

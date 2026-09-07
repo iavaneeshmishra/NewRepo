@@ -11,6 +11,8 @@ final class BlePeripheral: NSObject {
     private let queue = DispatchQueue(label: "app.ripple.mesh.peripheral")
     private var tx: CBMutableCharacteristic!
     private var links: [UUID: PeripheralLink] = [:]
+    private let log = EventLog.global
+    func allLinks() -> [BleLink] { queue.sync { Array(links.values) } }
     private var serviceAdded = false
     private(set) var isAdvertising = false
 
@@ -101,24 +103,25 @@ extension BlePeripheral: CBPeripheralManagerDelegate {
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
-        if let error { Self.log.error("add service: \(error.localizedDescription)"); serviceAdded = false }
+        if let error { Self.log.error("add service: \(error.localizedDescription)"); log.e("peripheral", "add service failed: \(error.localizedDescription)"); serviceAdded = false }
     }
 
     func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
         isAdvertising = error == nil
-        if let error { Self.log.error("advertise: \(error.localizedDescription)") } else { Self.log.info("advertising") }
+        if let error { Self.log.error("advertise: \(error.localizedDescription)"); log.e("peripheral", "advertise failed: \(error.localizedDescription)") }
+        else { Self.log.info("advertising"); log.i("peripheral", "advertising mesh service") }
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
         guard characteristic.uuid == CBUUID(string: MeshProtocol.txUUID), links[central.identifier] == nil else { return }
         let link = PeripheralLink(central: central, owner: self)
         links[central.identifier] = link
-        Self.log.info("\(link.id) ready, frame=\(link.frameSize)")
+        Self.log.info("\(link.id) ready, frame=\(link.frameSize)"); log.i("peripheral", "\(link.id) subscribed, frame \(link.frameSize) B")
         onLinkReady(link)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didUnsubscribeFrom characteristic: CBCharacteristic) {
-        links[central.identifier]?.close()
+        if let l = links[central.identifier] { log.i("peripheral", "\(l.id) unsubscribed"); l.close() }
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {

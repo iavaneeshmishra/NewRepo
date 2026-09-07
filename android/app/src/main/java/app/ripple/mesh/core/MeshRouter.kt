@@ -74,6 +74,7 @@ class MeshRouter(
     private class RelayEntry(val packet: Packet, val expiresAt: Long) { val deliveredTo = HashSet<String>() }
 
     private val lock = ReentrantLock()
+    private val log = EventLog.global
     private val links = LinkedHashMap<String, Link>()
     private val peers = LinkedHashMap<String, Peer>()
     private val seen = object : LinkedHashMap<String, Long>(256, 0.75f, false) {
@@ -107,6 +108,7 @@ class MeshRouter(
     fun peers(): List<Peer> = lock.withLock { peers.values.toList() }
     fun peer(nodeId: NodeId): Peer? = lock.withLock { peers[nodeId.hex] }
     fun linkCount(): Int = lock.withLock { links.size }
+    fun linkSnapshots(): List<Pair<String, String?>> = lock.withLock { links.values.map { it.id to it.peerHex } }
     fun directNeighbourCount(): Int = lock.withLock { links.values.count { it.peerHex != null } }
 
     fun setDisplayName(name: String): Unit = lock.withLock {
@@ -144,6 +146,7 @@ class MeshRouter(
     fun sendSos(text: String, location: SosLocation? = null): ByteArray = originate(PacketFactory.sos(identity, text, location))
 
     private fun originate(packet: Packet): ByteArray = lock.withLock {
+        if (packet.type != PacketType.ACK) log.i("router", "sending ${packet.type} ${packet.messageIdHex.take(8)} on ${links.size} link(s)")
         markSeen(packet)
         store(packet, fromLink = null)
         broadcast(packet, except = null)
@@ -162,13 +165,15 @@ class MeshRouter(
     private fun onLinkIdentified(link: Link, peerHex: String) {
         // Duplicate-link suppression: the node with the larger id closes the newer link.
         val duplicate = links.values.any { it !== link && it.peerHex == peerHex }
-        if (duplicate && selfId.hex > peerHex) { link.close(); links.remove(link.id); return }
+        if (duplicate && selfId.hex > peerHex) { log.d("router", "closing duplicate link ${link.id} to ${peerHex.takeLast(4)}"); link.close(); links.remove(link.id); return }
+        log.i("router", "link ${link.id} is ${peers[peerHex]?.name ?: peerHex.takeLast(4)}")
 
         peers[peerHex]?.let { listener.onLinkIdentified(link, it) }
 
         // Store-and-forward replay of anything this peer might still need.
         val peerId = NodeId.fromHex(peerHex)
         val now = clock()
+        var replayed = 0
         for (entry in relayStore.values) {
             if (entry.expiresAt < now || peerHex in entry.deliveredTo) continue
             val dest = entry.packet.destination
@@ -178,8 +183,10 @@ class MeshRouter(
             if (forPeer || isBroadcast || unknownDest) {
                 entry.deliveredTo.add(peerHex)
                 link.send(entry.packet.encode())
+                replayed++
             }
         }
+        if (replayed > 0) log.i("router", "replayed $replayed stored packet(s) to ${peerHex.takeLast(4)}")
     }
 
     // ---- inbound ------------------------------------------------------------------
@@ -212,15 +219,16 @@ class MeshRouter(
             val peer = peers[p.source.hex]
             val verified = peer != null && Crypto.verify(peer.publicKey, p.encodeUnsigned(), p.signature)
             when {
-                peer != null && !verified -> return                     // forged: known key, bad signature
-                forMe && peer == null -> { relay(p, link); return }     // can't verify or decrypt yet
+                peer != null && !verified -> { log.w("router", "dropped ${p.type} ${p.messageIdHex.take(8)}: bad signature for ${p.source.short}"); return }
+                forMe && peer == null -> { log.d("router", "${p.type} ${p.messageIdHex.take(8)} for me from unknown ${p.source.short}; relaying"); relay(p, link); return }
             }
             when (p.type) {
                 PacketType.MESSAGE -> {
                     val text = if (p.isEncrypted) {
                         try { String(Crypto.decrypt(identity.privateKey, p.messageId, p.source, p.destination, p.payload), Charsets.UTF_8) }
-                        catch (_: Exception) { return }
+                        catch (_: Exception) { log.w("router", "could not decrypt ${p.messageIdHex.take(8)} from ${p.source.short}"); return }
                     } else String(p.payload, Charsets.UTF_8)
+                    log.i("router", "${if (isBroadcast) "broadcast" else "direct"} ${p.messageIdHex.take(8)} from ${peer?.name ?: p.source.short} via ${link.id} (ttl ${p.ttl})")
                     listener.onMessage(InboundMessage(p.messageId, p.source, peer?.name, text, isBroadcast, verified, p.timestamp))
                     if (forMe) originate(PacketFactory.ack(identity, p.source, p.messageId))
                 }
@@ -241,6 +249,7 @@ class MeshRouter(
 
         val hops = Protocol.MAX_TTL - p.ttl + 1
         val prev = peers[p.source.hex]
+        if (prev == null) log.i("router", "new peer ${ann.name} (${p.source.short}) at $hops hop(s)")
         peers[p.source.hex] = Peer(p.source, publicKey, ann.publicKeyWire, ann.name, now, if (prev != null) minOf(prev.hops, hops) else hops)
         listener.onPeersChanged(peers.values.toList())
 

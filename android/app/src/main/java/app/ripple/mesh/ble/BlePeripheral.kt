@@ -18,6 +18,7 @@ import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
+import app.ripple.mesh.core.EventLog
 import app.ripple.mesh.core.Protocol
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -43,19 +44,22 @@ class BlePeripheral(
     private var server: BluetoothGattServer? = null
     private var tx: BluetoothGattCharacteristic? = null
     private val links = ConcurrentHashMap<String, PeripheralLink>()   // address -> link
+    private val log = EventLog.global
+    fun links(): List<BleLink> = links.values.toList()
+    val isAdvertising: Boolean get() = advertising
     private val mtus = ConcurrentHashMap<String, Int>()
     @Volatile private var advertising = false
 
     fun connectedAddresses(): Set<String> = links.keys
 
     private val advertiseCallback = object : AdvertiseCallback() {
-        override fun onStartSuccess(settingsInEffect: AdvertiseSettings) { advertising = true; Log.i(TAG, "advertising") }
-        override fun onStartFailure(errorCode: Int) { advertising = false; Log.w(TAG, "advertise failed: $errorCode") }
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings) { advertising = true; Log.i(TAG, "advertising"); log.i(TAG, "advertising mesh service") }
+        override fun onStartFailure(errorCode: Int) { advertising = false; Log.w(TAG, "advertise failed: $errorCode"); log.e(TAG, "advertise failed: code $errorCode") }
     }
 
     fun start() {
         if (server != null) return
-        val srv = manager.openGattServer(appContext, serverCallback) ?: run { Log.w(TAG, "openGattServer failed"); return }
+        val srv = manager.openGattServer(appContext, serverCallback) ?: run { Log.w(TAG, "openGattServer failed"); log.e(TAG, "openGattServer failed"); return }
         server = srv
         val service = BluetoothGattService(UUID.fromString(Protocol.SERVICE_UUID), BluetoothGattService.SERVICE_TYPE_PRIMARY)
         val rx = BluetoothGattCharacteristic(
@@ -75,7 +79,7 @@ class BlePeripheral(
     }
 
     private fun startAdvertising() {
-        val advertiser = adapter.bluetoothLeAdvertiser ?: run { Log.w(TAG, "no advertiser (peripheral mode unsupported)"); return }
+        val advertiser = adapter.bluetoothLeAdvertiser ?: run { Log.w(TAG, "no advertiser (peripheral mode unsupported)"); log.e(TAG, "this device cannot advertise (no peripheral mode) — it can still connect out"); return }
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
@@ -95,7 +99,8 @@ class BlePeripheral(
     private val serverCallback = object : BluetoothGattServerCallback() {
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
             if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                links.remove(device.address)?.close(); mtus.remove(device.address)
+                links.remove(device.address)?.let { log.i(TAG, "${it.id} disconnected (status $status)"); it.close() }
+                mtus.remove(device.address)
             }
         }
 
@@ -108,7 +113,7 @@ class BlePeripheral(
                 val link = PeripheralLink(device)
                 link.frameSize = minOf((mtus[device.address] ?: 23) - 3, 512)
                 if (links.putIfAbsent(device.address, link) == null) {
-                    link.start(); Log.i(TAG, "${link.id} ready, frame=${link.frameSize}"); onLinkReady(link)
+                    link.start(); Log.i(TAG, "${link.id} ready, frame=${link.frameSize}"); log.i(TAG, "${link.id} subscribed, frame ${link.frameSize} B"); onLinkReady(link)
                 }
             } else if (!enable) {
                 links.remove(device.address)?.close()

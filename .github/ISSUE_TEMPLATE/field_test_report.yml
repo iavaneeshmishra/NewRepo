@@ -1,0 +1,45 @@
+name: Field test report
+description: Results from running docs/FIELD_TESTING.md scenarios on real phones
+title: "[field] "
+labels: ["field-test"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you — real-device results are the most valuable contribution right now. Negative results are just as useful.
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: Commit hash, APK artifact run number, or TestFlight build
+    validations: { required: true }
+  - type: textarea
+    id: devices
+    attributes:
+      label: Devices and roles
+      description: One per line — role, manufacturer, model, OS version
+      placeholder: |
+        A: Samsung Galaxy S21, Android 14
+        B: Realme 11, Android 13
+        C: iPhone 13, iOS 17.5
+    validations: { required: true }
+  - type: textarea
+    id: results
+    attributes:
+      label: Scenario results
+      description: Scenario number, pass/fail, and the timings you recorded
+      placeholder: |
+        1.1 ✅ discovered in 6 s, A was central, RSSI -52
+        1.6 ❌ never arrived on B after 10 min (screen locked)
+        2.3 ✅ ~2.5 s to ✓✓, nothing visible on B
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics exports
+      description: Paste or attach the Diagnostics export from EVERY phone involved (Settings → Diagnostics → share icon).
+    validations: { required: true }
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Environment (indoors/outdoors, distances), battery settings, anything odd
