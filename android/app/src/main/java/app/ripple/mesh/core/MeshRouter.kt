@@ -35,6 +35,7 @@ data class InboundMessage(
 
 /** Delivery report for an SOS beacon. `location` is null unless the sender opted in to GPS. */
 data class SosBeacon(
+    val messageId: ByteArray,
     val from: NodeId,
     val fromName: String?,
     val text: String,
@@ -202,7 +203,7 @@ class MeshRouter(
             val verified = peer != null && Crypto.verify(peer.publicKey, p.encodeUnsigned(), p.signature)
             if (peer != null && !verified) return // forged beacon from a known peer
             val sos = try { SosCodec.decode(p.payload) } catch (_: Exception) { relay(p, link); return }
-            listener.onSos(SosBeacon(p.source, peer?.name, sos.text, sos.location, verified, p.timestamp))
+            listener.onSos(SosBeacon(p.messageId, p.source, peer?.name, sos.text, sos.location, verified, p.timestamp))
             relay(p, link) // beacons always flood onward
             return
         }

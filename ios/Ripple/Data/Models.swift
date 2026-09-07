@@ -53,11 +53,31 @@ final class RelayPacketRecord {
     }
 }
 
+/// Received SOS beacon history (PROTOCOL.md §2.2), retained for ~90 days.
+@Model
+final class SosRecord {
+    @Attribute(.unique) var messageId: String
+    var fromNodeId: String
+    var fromName: String?
+    var text: String
+    var latE7: Int32?
+    var lngE7: Int32?
+    var accuracyMeters: Int?
+    var verified: Bool
+    var timestamp: Date
+
+    init(messageId: String, fromNodeId: String, fromName: String?, text: String, latE7: Int32?, lngE7: Int32?, accuracyMeters: Int?, verified: Bool, timestamp: Date) {
+        self.messageId = messageId; self.fromNodeId = fromNodeId; self.fromName = fromName
+        self.text = text; self.latE7 = latE7; self.lngE7 = lngE7; self.accuracyMeters = accuracyMeters
+        self.verified = verified; self.timestamp = timestamp
+    }
+}
+
 enum Persistence {
     static let broadcastConversation = "broadcast"
 
     static func container() -> ModelContainer {
-        let schema = Schema([MessageRecord.self, PeerRecord.self, RelayPacketRecord.self])
+        let schema = Schema([MessageRecord.self, PeerRecord.self, RelayPacketRecord.self, SosRecord.self])
         do {
             return try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema)])
         } catch {

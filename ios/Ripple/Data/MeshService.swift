@@ -42,6 +42,12 @@ final class MeshService: ObservableObject, RouterListener {
         router.listener = self
         Self.log.info("identity \(identity.nodeId.display)")
 
+        // Restore the persisted power profile before rebuilding in-memory state.
+        if let code = IdentityStore.powerProfile, let profile = BatteryProfile(rawValue: code) {
+            powerProfile = profile
+            router.setBatteryProfile(code)
+        }
+
         restoreState()
 
         let r = router
@@ -57,7 +63,12 @@ final class MeshService: ObservableObject, RouterListener {
         peripheral.onStateChange = { [weak self] _ in self?.scheduleStatusRefresh() }
 
         housekeeping = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.persistRelayStore(); self?.central.startScanning() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.persistRelayStore()
+                self.pruneSosHistory()
+                self.central.startScanning()
+            }
         }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
@@ -93,6 +104,18 @@ final class MeshService: ObservableObject, RouterListener {
             if existing == nil { ctx.insert(RelayPacketRecord(messageId: id, bytes: p.encode(), expiresAt: expires)) }
         }
         try? ctx.save()
+    }
+
+    /// Received SOS beacons are retained for ~90 days before being pruned.
+    private static let sosRetention: TimeInterval = 90 * 24 * 3600
+
+    private func pruneSosHistory() {
+        let ctx = container.mainContext
+        let cutoff = Date().addingTimeInterval(-Self.sosRetention)
+        if let old = try? ctx.fetch(FetchDescriptor<SosRecord>(predicate: #Predicate { $0.timestamp < cutoff })) {
+            old.forEach { ctx.delete($0) }
+            try? ctx.save()
+        }
     }
 
     // MARK: BLE glue
@@ -158,6 +181,12 @@ final class MeshService: ObservableObject, RouterListener {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.recentSos = beacon
+            let rec = SosRecord(messageId: beacon.messageId.hex, fromNodeId: beacon.from.hex, fromName: beacon.fromName,
+                                text: beacon.text, latE7: beacon.location?.latE7, lngE7: beacon.location?.lngE7,
+                                accuracyMeters: beacon.location?.accuracyMeters, verified: beacon.verified,
+                                timestamp: Date(timeIntervalSince1970: Double(beacon.timestamp) / 1000))
+            self.container.mainContext.insert(rec)
+            try? self.container.mainContext.save()
             let content = UNMutableNotificationContent()
             content.title = "SOS — \(beacon.fromName ?? beacon.from.display)"
             content.body = beacon.text.isEmpty ? "An SOS beacon is active nearby." : beacon.text
@@ -203,6 +232,7 @@ final class MeshService: ObservableObject, RouterListener {
 
     func setPowerProfile(_ profile: BatteryProfile) {
         powerProfile = profile
+        IdentityStore.powerProfile = profile.rawValue
         router.setBatteryProfile(profile.rawValue)
     }
 
