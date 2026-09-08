@@ -1,0 +1,7 @@
+Ripple 1.0.1 — Phase 0. Still no servers, still no INTERNET permission, same wire protocol as 1.0.0.
+
+• Guided field-test mode with structured diagnostics export
+• QR identity codes, 12-digit safety codes, verified-peer pinning (render-only, no camera)
+• Passphrase-encrypted identity backup and restore — same node ID after reinstall
+• Notification deep-links, unread badges, screen-reader labels
+• Privacy-bounded crash records; reproducible no-internet release builds
