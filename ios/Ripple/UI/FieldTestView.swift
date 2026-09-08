@@ -34,7 +34,9 @@ struct FieldTestView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { confirmReset = true } label: { Image(systemName: "trash") }
+                    .accessibilityLabel("Reset session")
                 Button { shareText = session.export(meshSnapshot: mesh.diagnosticsHeader()) } label: { Image(systemName: "square.and.arrow.up") }
+                    .accessibilityLabel("Share field-test report")
             }
         }
         .alert("Reset session", isPresented: $confirmReset) {

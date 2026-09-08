@@ -148,6 +148,7 @@ struct PairView: View {
                 Button {
                     UIPasteboard.general.string = Pairing.IdentityCode(nodeIdHex: peer.nodeIdHex, publicKeyWireHex: peer.publicKeyWireHex, name: peer.name).encode()
                 } label: { Image(systemName: "square.and.arrow.up") }
+                .accessibilityLabel("Copy identity code")
                 .buttonStyle(.borderless)
             }
             Text(peer.safetyCode).font(.body.monospaced())

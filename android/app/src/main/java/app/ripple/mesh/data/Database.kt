@@ -89,6 +89,9 @@ interface MessageDao {
     @Query("UPDATE messages SET status = 'DELIVERED' WHERE conversation = :conversation AND outgoing = 0 AND status = 'RECEIVED'")
     suspend fun markRead(conversation: String)
 
+    @Query("SELECT COUNT(*) FROM messages WHERE status = 'RECEIVED' AND outgoing = 0")
+    suspend fun countUnread(): Int
+
     @Query("SELECT COUNT(*) FROM messages WHERE messageId = :messageId")
     suspend fun exists(messageId: String): Int
 }

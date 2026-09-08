@@ -38,6 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,7 +94,7 @@ fun HomeScreen(vm: MeshViewModel, onOpenChat: (String) -> Unit, onOpenSettings: 
                             headlineContent = { Text(stringResource(R.string.broadcast_channel)) },
                             supportingContent = { Text(broadcast?.lastText ?: stringResource(R.string.broadcast_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingContent = { Icon(Icons.Default.Campaign, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                            trailingContent = { if ((broadcast?.unread ?: 0) > 0) Badge { Text("${broadcast!!.unread}") } },
+                            trailingContent = { if ((broadcast?.unread ?: 0) > 0) UnreadBadge(broadcast!!.unread) },
                             modifier = Modifier.clickable { onOpenChat(MeshService.BROADCAST_CONVERSATION) },
                         )
                     }
@@ -104,7 +107,7 @@ fun HomeScreen(vm: MeshViewModel, onOpenChat: (String) -> Unit, onOpenSettings: 
                             trailingContent = {
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(c.lastTimestamp)), style = MaterialTheme.typography.labelSmall)
-                                    if (c.unread > 0) Badge { Text("${c.unread}") }
+                                    if (c.unread > 0) UnreadBadge(c.unread)
                                 }
                             },
                             modifier = Modifier.clickable { onOpenChat(c.conversation) },
@@ -128,6 +131,7 @@ fun HomeScreen(vm: MeshViewModel, onOpenChat: (String) -> Unit, onOpenSettings: 
 @Composable
 private fun PeerRow(peer: PeerEntity, onClick: () -> Unit) {
     val recent = System.currentTimeMillis() - peer.lastSeen < 5 * 60_000
+    val dotLabel = stringResource(if (recent) R.string.peer_online_desc else R.string.peer_offline_desc)
     ListItem(
         headlineContent = { Text(peer.name) },
         supportingContent = {
@@ -138,10 +142,21 @@ private fun PeerRow(peer: PeerEntity, onClick: () -> Unit) {
         },
         leadingContent = { Avatar(peer.nodeId) },
         trailingContent = {
-            Box(Modifier.size(10.dp).background(if (recent) Color(0xFF2ECC71) else MaterialTheme.colorScheme.outlineVariant, CircleShape))
+            Box(
+                Modifier.size(10.dp)
+                    .background(if (recent) Color(0xFF2ECC71) else MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    .semantics { contentDescription = dotLabel },
+            )
         },
         modifier = Modifier.clickable(onClick = onClick),
     )
+}
+
+@Composable
+private fun UnreadBadge(count: Int) {
+    // Resolve the plural in composable scope before entering the semantics lambda.
+    val unreadLabel = pluralStringResource(R.plurals.unread_badge, count, count)
+    Badge(Modifier.clearAndSetSemantics { contentDescription = unreadLabel }) { Text("$count") }
 }
 
 /** Deterministic colored circle derived from the node id. */

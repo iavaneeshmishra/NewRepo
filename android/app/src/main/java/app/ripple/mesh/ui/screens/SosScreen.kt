@@ -29,8 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.ripple.mesh.R
 import app.ripple.mesh.ui.MeshViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,8 +43,8 @@ fun SosScreen(vm: MeshViewModel, onBack: () -> Unit) {
 
     Scaffold(topBar = {
         TopAppBar(
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) } },
-            title = { Text("SOS Beacon") },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+            title = { Text(stringResource(R.string.sos_screen)) },
         )
     }) { padding ->
         Column(

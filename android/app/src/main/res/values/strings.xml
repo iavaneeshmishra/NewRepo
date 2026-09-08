@@ -27,7 +27,18 @@
     <string name="peers_empty">No peers yet. Keep Bluetooth on and bring another phone running Ripple within range.</string>
     <string name="message_hint">Message</string>
     <string name="send">Send</string>
+    <string name="back">Back</string>
     <string name="unverified">unverified</string>
+    <string name="status_pending_short">Pending</string>
+    <string name="status_sent">Sent</string>
+    <string name="status_delivered">Delivered</string>
+    <string name="status_failed">Failed</string>
+    <string name="peer_online_desc">Online</string>
+    <string name="peer_offline_desc">Offline</string>
+    <plurals name="unread_badge">
+        <item quantity="one">%d unread message</item>
+        <item quantity="other">%d unread messages</item>
+    </plurals>
 
     <string name="settings">Settings</string>
     <string name="your_identity">Your node ID</string>
@@ -36,6 +47,8 @@
     <string name="save">Save</string>
     <string name="mesh_status">Mesh status</string>
     <string name="status_detail">Bluetooth %1$s · %2$d direct links · %3$d peers known</string>
+    <string name="sos_screen">SOS beacon</string>
+    <string name="power_screen">Power profile</string>
     <string name="diagnostics">Diagnostics</string>
     <string name="clear_log">Clear log</string>
     <string name="share_log">Share diagnostics</string>
