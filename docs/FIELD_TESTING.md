@@ -4,6 +4,13 @@ Bluetooth behaves differently on every phone. The only way Ripple gets reliable 
 people running these scenarios on real hardware and reporting what happened. Each
 scenario takes 2–10 minutes.
 
+**Prefer the in-app version:** Settings → **Field test** walks you through the same
+checklist below with per-scenario prompts, PASS/FAIL/SKIP buttons, space for notes
+and timings, and a share button that exports a report pre-formatted for the
+[Field test report](../.github/ISSUE_TEMPLATE/field_test_report.yml) issue
+template (with a Diagnostics snapshot appended). This page remains the reference
+for what each scenario is testing.
+
 **Before you start, on every phone:**
 - Install the same build on each device (note the commit or APK/TestFlight build number).
 - Grant the Bluetooth permission; on Android 13+ also allow notifications.

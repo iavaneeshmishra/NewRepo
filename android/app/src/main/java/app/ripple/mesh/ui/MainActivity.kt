@@ -40,6 +40,7 @@ import androidx.navigation.navArgument
 import app.ripple.mesh.R
 import app.ripple.mesh.ui.screens.ChatScreen
 import app.ripple.mesh.ui.screens.DiagnosticsScreen
+import app.ripple.mesh.ui.screens.FieldTestScreen
 import app.ripple.mesh.ui.screens.HomeScreen
 import app.ripple.mesh.ui.screens.PowerScreen
 import app.ripple.mesh.ui.screens.SettingsScreen
@@ -47,10 +48,11 @@ import app.ripple.mesh.ui.screens.SosScreen
 
 class MainActivity : ComponentActivity() {
     private val vm: MeshViewModel by viewModels()
+    private val fieldTestVm: FieldTestViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { RippleTheme { RippleRoot(vm, intent) } }
+        setContent { RippleTheme { RippleRoot(vm, fieldTestVm, intent) } }
     }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent) }
@@ -65,7 +67,7 @@ fun requiredPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= 31) {
 } else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
 
 @Composable
-fun RippleRoot(vm: MeshViewModel, launchIntent: Intent?) {
+fun RippleRoot(vm: MeshViewModel, fieldTestVm: FieldTestViewModel, launchIntent: Intent?) {
     val context = LocalContext.current
     var granted by remember {
         mutableStateOf(requiredPermissions().all { ContextCompat.checkSelfPermission(context, it) == android.content.pm.PackageManager.PERMISSION_GRANTED })
@@ -100,11 +102,13 @@ fun RippleRoot(vm: MeshViewModel, launchIntent: Intent?) {
                 onOpenSos = { nav.navigate("sos") },
                 onOpenPower = { nav.navigate("power") },
                 onOpenDiagnostics = { nav.navigate("diagnostics") },
+                onOpenFieldTest = { nav.navigate("fieldtest") },
             )
         }
         composable("sos") { SosScreen(vm, onBack = { nav.popBackStack() }) }
         composable("power") { PowerScreen(vm, onBack = { nav.popBackStack() }) }
         composable("diagnostics") { DiagnosticsScreen(vm, onBack = { nav.popBackStack() }) }
+        composable("fieldtest") { FieldTestScreen(mesh = vm, ft = fieldTestVm, onBack = { nav.popBackStack() }) }
     }
 }
 
