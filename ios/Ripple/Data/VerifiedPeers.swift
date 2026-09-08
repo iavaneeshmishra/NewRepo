@@ -31,7 +31,7 @@ enum VerifiedPeers {
 
     static func find(_ nodeIdHex: String) -> VerifiedPeer? {
         let id = nodeIdHex.lowercased()
-        all().first { $0.nodeIdHex == id }
+        return all().first { $0.nodeIdHex == id }
     }
 
     /// Pin (or re-confirm) a peer key. On `.conflict` nothing is written — the existing
