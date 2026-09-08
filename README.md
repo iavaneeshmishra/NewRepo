@@ -19,6 +19,7 @@ No servers. No accounts. No SIM. The Android app doesn't even request the
 - **Delivery receipts** — direct messages get an ACK routed back through the mesh (✓ sent → ✓✓ delivered).
 - **Background operation** — Android foreground service; iOS Bluetooth background modes with state restoration.
 - **Hardware-backed identity** — Android Keystore / iOS Keychain; your node ID is derived from your public key.
+- **Out-of-band pairing codes** — Settings shows your full public key as a scannable identity code; paired phones compare a 12-digit safety number so verification isn't limited by the 8-byte node id (see [`docs/PAIRING.md`](docs/PAIRING.md)).
 - **One protocol, three implementations** — Kotlin, Swift, and a Node reference that generates shared test vectors both apps must pass.
 - **Works with one phone** — a built-in *simulated neighbourhood* (two fake peers, one of them two hops away and intermittently out of range) lets you try everything without a second device.
 - **Diagnostics built in** — link states, RSSI, throughput, a rolling event log and one-tap export for bug reports.
