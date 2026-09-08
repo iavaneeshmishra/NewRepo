@@ -48,7 +48,8 @@ object Pairing {
     fun decodeIdentityCode(code: String): IdentityCode? {
         val parts = code.split(':')
         if (parts.size !in 4..5) return null
-        if (parts[0] != PREFIX || parts[1] != CODE_VERSION) return null
+        // Prefix/version are ASCII; accept either case. Hex segments are normalised below.
+        if (!parts[0].equals(PREFIX, ignoreCase = true) || !parts[1].equals(CODE_VERSION, ignoreCase = true)) return null
         val nodeIdHex = parts[2].lowercase(Locale.ROOT)
         val keyHex = parts[3].lowercase(Locale.ROOT)
         if (nodeIdHex.length != NODE_ID_HEX_LEN || keyHex.length != PUBLIC_KEY_HEX_LEN) return null

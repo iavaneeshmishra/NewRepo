@@ -39,7 +39,9 @@ enum Pairing {
     static func decodeIdentityCode(_ code: String) -> IdentityCode? {
         let parts = code.split(separator: ":")
         guard parts.count == 4 || parts.count == 5 else { return nil }
-        guard parts[0] == prefix, parts[1] == codeVersion else { return nil }
+        // Prefix/version are ASCII; accept either case. Hex segments are normalised below.
+        guard parts[0].caseInsensitiveCompare(prefix) == .orderedSame,
+              parts[1].caseInsensitiveCompare(codeVersion) == .orderedSame else { return nil }
         let nodeIdHex = parts[2].lowercased()
         let keyHex = parts[3].lowercased()
         guard nodeIdHex.count == 16, keyHex.count == 130 else { return nil }

@@ -36,8 +36,9 @@ Encoding rules:
   UTF-8 byte becomes `%XX` with uppercase hex. `:` (the field separator),
   spaces and non-ASCII characters are therefore always encoded.
 * The optional name segment is omitted entirely when the name is blank.
-* Decoders are case-insensitive on hex (canonical form is lowercase) and must
-  reject codes with the wrong prefix, version, lengths, or hex characters.
+* Decoders are case-insensitive on hex and on the ASCII prefix/version
+  (canonical form is lowercase) and must reject codes with the wrong prefix,
+  version, lengths, or hex characters.
 
 ## 2. Safety code
 

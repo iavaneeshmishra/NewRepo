@@ -44,8 +44,9 @@ final class PairingTests: XCTestCase {
         XCTAssertEqual("Asha", Pairing.percentEncode("Asha"))
         XCTAssertEqual("Zo%C3%AB%20%F0%9F%99%82", Pairing.percentEncode("Zoë 🙂"))
         XCTAssertEqual("Zoë 🙂", Pairing.percentDecode("Zo%C3%AB%20%F0%9F%99%82"))
-        // Stray '%' is tolerated.
-        XCTAssertEqual("a%b", Pairing.percentDecode("a%zzb"))
+        // A stray '%' that is not followed by hex is kept literally.
+        XCTAssertEqual("a%zzb", Pairing.percentDecode("a%zzb"))
+        XCTAssertEqual("100%", Pairing.percentDecode("100%"))
     }
 
     func testMalformedAndInconsistentCodesAreRejected() {

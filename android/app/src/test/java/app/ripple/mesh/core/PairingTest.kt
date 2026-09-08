@@ -49,8 +49,9 @@ class PairingTest {
         assertEquals("Asha", Pairing.percentEncode("Asha"))
         assertEquals("Zo%C3%AB%20%F0%9F%99%82", Pairing.percentEncode("Zoë 🙂"))
         assertEquals("Zoë 🙂", Pairing.percentDecode("Zo%C3%AB%20%F0%9F%99%82"))
-        // Stray '%' is tolerated.
-        assertEquals("a%b", Pairing.percentDecode("a%zzb"))
+        // A stray '%' that is not followed by hex is kept literally.
+        assertEquals("a%zzb", Pairing.percentDecode("a%zzb"))
+        assertEquals("100%", Pairing.percentDecode("100%"))
     }
 
     @Test fun `malformed and inconsistent codes are rejected`() {
