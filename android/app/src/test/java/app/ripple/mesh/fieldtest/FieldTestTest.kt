@@ -48,7 +48,8 @@ class FieldTestTest {
         assertEquals("6 s, A central, RSSI -52", s.entry("1.1").note)
 
         // Mutations are immutable: the original session is untouched.
-        assertFalse(FieldTestSession().record("1.1", FieldTestResult.PASSED) == FieldTestSession())
+        val original = FieldTestSession()
+        assertTrue(original.record("1.1", FieldTestResult.PASSED) != original)
     }
 
     @Test fun `recording preserves earlier entries and replaces verdicts`() {
