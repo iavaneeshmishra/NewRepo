@@ -14,14 +14,14 @@ jobs:
     name: Android release AAB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Configure signing when all secrets are present
         id: signing
@@ -125,7 +125,7 @@ jobs:
           if [[ -f "$mapping" ]]; then cp "$mapping" release-artifacts/mapping.txt; fi
           echo "aab_path=android/$aab" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: ripple-android-${{ github.ref_name }}-${{ steps.signing.outputs.label }}
           path: android/release-artifacts/
