@@ -73,16 +73,25 @@ later phase is validated against reality instead of simulation.
   for.
 
 ### 0.2 QR pairing + key-change alerts  · ●●○ · app-only
-- Settings shows the node ID as a QR code (own public key + name + ID); a
-  "Add peer" scan imports the peer's public key, pins it (TOFU), and starts a
-  conversation — no more reading 16 hex chars aloud.
-- After pairing, a simple numeric comparison (`safety code` derived from both
-  public keys) displayed on both phones gives out-of-band verification.
-- Any later key change for a pinned peer surfaces a loud, unmissable alert in
-  that chat (possible MITM), instead of silently accepting the new ANNOUNCE key.
+- **Identity codes & safety numbers (landed):** out-of-band pairing format and
+  12-digit safety-code derivation in pure Kotlin/Swift with shared byte-level test
+  vectors (`docs/PAIRING.md`, `core/Pairing` on both platforms). No wire changes.
+- Pairing UI: Settings shows your identity as a QR code (public key + name + id);
+  an "Add peer" scan/paste imports the peer's key and starts a conversation —
+  no more reading 16 hex chars aloud. After pairing, both phones show the same
+  12-digit safety code for an out-of-band compare, and the app stores the peer as
+  **verified** (full-key pin).
+- Verified-key bookkeeping: once a peer is verified, the app watches for a
+  discrepancy between the verified key and the key currently in the peer table
+  and alerts loudly in that chat if one ever appears. *Scope note:* under v1's
+  8-byte ids an ANNOUNCE for an existing id carries a new key only on a ~2^64
+  SHA-256 prefix collision (the router already requires
+  `id == SHA-256(key)[0:8]`), so this is defence-in-depth today and becomes
+  load-bearing when key rotation lands in Phase 2.2 — a core/router change is
+  deliberately deferred until then rather than shipping untestable code.
 - Acceptance: two phones pair by QR in < 60 s; substituting a different key
-  between scans produces a different safety code and a key-change alert on
-  reconnect.
+  between scans produces a different safety code; a verified peer whose key
+  changes (2.2) raises an unmissable alert.
 
 ### 0.3 Identity backup & restore  · ●●○ · app-only
 - Export the identity key as an encrypted blob (passphrase → PBKDF2 → AES-GCM,
