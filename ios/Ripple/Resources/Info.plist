@@ -15,9 +15,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>1.0.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<!-- Conservative export-compliance declaration: Ripple encrypts message content. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<true/>
