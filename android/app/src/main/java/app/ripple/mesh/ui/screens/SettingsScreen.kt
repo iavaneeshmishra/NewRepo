@@ -41,6 +41,7 @@ fun SettingsScreen(
     onOpenSos: () -> Unit = {},
     onOpenPower: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onOpenFieldTest: () -> Unit = {},
 ) {
     val selfId by vm.selfId.collectAsStateWithLifecycle()
     val savedName by vm.displayName.collectAsStateWithLifecycle()
@@ -75,7 +76,11 @@ fun SettingsScreen(
                 Button(onClick = onOpenSos, modifier = Modifier.weight(1f)) { Text("SOS beacon") }
                 Button(onClick = onOpenPower, modifier = Modifier.weight(1f)) { Text("Power profile") }
             }
-            OutlinedButton(onClick = onOpenDiagnostics) { Text(stringResource(R.string.diagnostics)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onOpenDiagnostics, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.diagnostics)) }
+                OutlinedButton(onClick = onOpenFieldTest, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.field_test)) }
+            }
+            Text(stringResource(R.string.field_test_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.about_blurb), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

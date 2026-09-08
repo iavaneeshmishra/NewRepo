@@ -48,4 +48,19 @@
     <string name="loopback_hint">Adds two fake peers (Asha, Ravi) so you can try the app with one phone. Ravi is two hops away and wanders out of range.</string>
     <string name="peers_empty_cta">Only one phone? Try the simulated neighbourhood in Settings → Diagnostics</string>
     <string name="about_blurb">Ripple never uses the internet. Messages hop phone-to-phone over Bluetooth LE, are signed by the sender, and direct messages are end-to-end encrypted. Messages for peers who are out of range are held and delivered when the mesh reconnects.</string>
+
+    <string name="field_test">Field test</string>
+    <string name="field_test_subtitle">Guided real-device checklist with an export ready for the field-test issue template</string>
+    <string name="ft_progress">%1$d of %2$d scenarios done</string>
+    <string name="ft_progress_detail">%1$d passed · %2$d failed · %3$d skipped</string>
+    <string name="ft_direct_links">%1$d direct links</string>
+    <string name="ft_hint">Mark each scenario as you go</string>
+    <string name="ft_steps">Do: %1$s</string>
+    <string name="ft_expected">Expected: %1$s</string>
+    <string name="ft_record">Record: %1$s</string>
+    <string name="ft_notes">Notes / timings</string>
+    <string name="ft_share">Share report</string>
+    <string name="ft_reset">Reset session</string>
+    <string name="ft_reset_confirm">Clear all verdicts and notes for this field-test run? The report has not been shared yet.</string>
+    <string name="cancel">Cancel</string>
 </resources>
