@@ -34,6 +34,7 @@ No servers. No accounts. No SIM. The Android app doesn't even request the
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the apps are put together |
 | [`docs/FIELD_TESTING.md`](docs/FIELD_TESTING.md) | Real-device test scenarios and how to report |
 | [`docs/I18N.md`](docs/I18N.md) | Android/iOS translation workflow and immutable protocol strings |
+| [`docs/RELEASING.md`](docs/RELEASING.md) | Tagged Android/iOS builds, store signing, and export compliance |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Workflow, sync rules, code style |
 | `android/` | Android app (Compose, Room, minSdk 26) |
 | `ios/` | iOS app (SwiftUI, SwiftData, iOS 17+) — `xcodegen generate` to create the project |

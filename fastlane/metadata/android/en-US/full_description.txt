@@ -1,0 +1,17 @@
+Ripple is an internet-free messenger for nearby Android and iOS phones. It has no servers and the Android app does not request the INTERNET permission.
+
+Messages travel phone-to-phone over Bluetooth Low Energy. Multi-hop flooding lets a phone relay packets for peers that cannot reach each other directly, while store-and-forward keeps packets for peers that reconnect later.
+
+Features:
+• A public channel for everyone nearby
+• End-to-end encrypted direct messages
+• Signed packets and delivery acknowledgements
+• Background mesh operation
+• Opt-in SOS beacons, with location attached only when you choose
+• Out-of-band identity verification with QR identity codes and 12-digit safety codes
+• Passphrase-encrypted identity backup and restore
+• Battery profiles, a simulated neighbourhood, guided field tests, and exportable diagnostics
+
+Ripple's QR codes are render-only. The app has no camera permission: scan with any QR app and paste the decoded identity or backup code into Ripple.
+
+Ripple is open source. The current v1 engine has conformance and simulation coverage but still needs more real-device field testing; review the documented security trade-offs before relying on it for high-risk use.

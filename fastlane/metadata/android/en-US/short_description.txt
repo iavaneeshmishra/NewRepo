@@ -1,0 +1,1 @@
+Offline, encrypted messaging over a Bluetooth LE phone-to-phone mesh

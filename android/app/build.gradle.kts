@@ -5,6 +5,20 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Release CI injects these only when all four signing secrets are available.
+// With none present, AGP intentionally emits an unsigned AAB for reproducible
+// source builds and F-Droid review (see docs/RELEASING.md).
+val releaseKeystorePath = System.getenv("RIPPLE_KEYSTORE_PATH")
+val releaseKeystorePassword = System.getenv("RIPPLE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("RIPPLE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("RIPPLE_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseKeystorePath,
+    releaseKeystorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "app.ripple.mesh"
     compileSdk = 35
@@ -18,11 +32,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(requireNotNull(releaseKeystorePath))
+                storePassword = requireNotNull(releaseKeystorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
         }
     }
 

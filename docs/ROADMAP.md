@@ -110,14 +110,17 @@ later phase is validated against reality instead of simulation.
   restore, A still decrypts old DMs and signs packets peers verify (field-test issue).
 
 ### 0.4 Release readiness  · ●●○ · app-only
-- Android: reproducible-ish debug/release builds from CI, Play internal track +
-  F-Droid submission metadata (keep the no-INTERNET claim verifiable).
-- iOS: TestFlight-friendly scheme/export config; document the signing setup in
-  `docs/` so a maintainer can cut a build without tribal knowledge.
-- Crash logs and the event log fold into the same Diagnostics export (never
-  message plaintext).
-- Acceptance: a maintainer can produce and publish both apps from a tagged
-  commit using only the docs in this repo.
+- **Landed:** tag/manual Android release CI builds an AAB, signs only when the
+  complete GitHub secret set is present, verifies the merged manifest still has
+  no `INTERNET`, and otherwise publishes an unsigned artifact with signing
+  instructions. Play internal-track and F-Droid metadata are documented/tracked.
+- **Landed:** a TestFlight-friendly Release archive scheme and export options;
+  `docs/RELEASING.md` covers Android keystores/secrets, Play, XcodeGen
+  archive/export, TestFlight, and the conservative encryption-export decision.
+- **Landed:** privacy-bounded previous-crash records fold into the existing
+  Diagnostics export (never message plaintext, keys, or full node IDs).
+- Acceptance run: a maintainer produces and publishes both apps from one tagged
+  commit using only `docs/RELEASING.md`; retain the store links with the release.
 
 ### 0.5 Small app-layer polish  · ●○○ · app-only
 - **Landed:** i18n scaffolding — Android resources plus deterministic iOS
