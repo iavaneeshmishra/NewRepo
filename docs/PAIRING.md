@@ -86,10 +86,50 @@ and iOS:
 
 Unit tests on both platforms assert the **same literal vectors**
 (`PairingTest.kt` / `PairingTests.swift`), including the canonical encoding of a
-fixed key and the safety code `5046 5756 7335` for a fixed key pair, so a code
-produced on one platform always decodes on the other.
+fixed key and the safety code `5046 5756 7335` for a fixed key pair, and the
+`verifyOutcome` pinning rule, so a code produced on one platform always decodes on
+the other and both platforms accept/refuse a pin identically.
 
-## 5. Versioning
+## 5. Pairing UI & verified-peer store
+
+Both apps expose **Settings → Pair & verify** (`PairScreen.kt` / `PairView.swift`):
+
+* **Show your code** — the §1 identity code is rendered as a QR with ZXing (Android)
+  / Core Image (iOS) and can be copied or shared as text. The app deliberately has no
+  camera permission: the *other* phone scans with any QR app and pastes the text into
+  its import box.
+* **Import a peer** — a pasted `RIPPLE-ID:v1:…` string goes through the full §1
+  validation; only a valid code is accepted. The summary shows the peer's name, node
+  id, key prefix, and the §2 safety code computed with your own key — so two people can
+  compare digits before and after pinning.
+* **Verified-peer store** (`VerifiedPeers.kt` / `VerifiedPeers.swift`) — pinning saves
+  `{node id, full public key, name, safety code, date}` as JSON in DataStore (Android)
+  / UserDefaults (iOS). Public keys are not secrets, so no extra encryption layer is
+  added; the blob stays in app-private storage and is never logged (§6).
+* **Conflict rule** — the pin decision is the pure shared function `Pairing.verifyOutcome`
+  (identical literal unit tests in `PairingTest.kt` / `PairingTests.swift`):
+
+  | Pinned key for that id | Imported key | Outcome |
+  |---|---|---|
+  | none | any | `VERIFIED` — record written |
+  | K | K | `ALREADY_VERIFIED` — record refreshed (name/date) |
+  | K | ≠ K | `CONFLICT` — **refused**; the existing pin is kept and the UI says so loudly |
+
+  Under v1 an id can only be *claimed* with a different key by a ~2^64 truncated-hash
+  collision (see the ROADMAP 0.2 scope note), so this is defence-in-depth today and
+  becomes load-bearing when key rotation lands in Phase 2.2. While the verified list is
+  open, each pin is also cross-checked against the mesh's current peer table and a
+  mismatch banner is shown.
+* **Re-share** — a pinned peer's identity code can be copied out of the list again
+  (reconstructed from the stored key), e.g. to hand to a third phone.
+
+## 6. Logging hygiene
+
+Node ids appear in the event log at most as 4-hex suffixes (the app-wide redaction
+rule); full keys, safety codes and the verified-peer store are never logged. Pairing
+UI actions write nothing to the log at all.
+
+## 7. Versioning
 
 This is an application-layer format. It can evolve independently of the mesh
 protocol version byte; the `v1` in the prefix is this format's own version.

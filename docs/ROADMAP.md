@@ -76,14 +76,16 @@ later phase is validated against reality instead of simulation.
 - **Identity codes & safety numbers (landed):** out-of-band pairing format and
   12-digit safety-code derivation in pure Kotlin/Swift with shared byte-level test
   vectors (`docs/PAIRING.md`, `core/Pairing` on both platforms). No wire changes.
-- Pairing UI: Settings shows your identity as a QR code (public key + name + id);
-  an "Add peer" scan/paste imports the peer's key and starts a conversation —
-  no more reading 16 hex chars aloud. After pairing, both phones show the same
-  12-digit safety code for an out-of-band compare, and the app stores the peer as
-  **verified** (full-key pin).
-- Verified-key bookkeeping: once a peer is verified, the app watches for a
-  discrepancy between the verified key and the key currently in the peer table
-  and alerts loudly in that chat if one ever appears. *Scope note:* under v1's
+- **Pairing UI + verified-peer store (landed):** Settings → *Pair & verify* shows your
+  identity code as a QR (ZXing / Core Image rendering — no camera; scan with any QR app
+  and paste), copies/shares the code, imports a peer's code with full §1 validation and
+  the 12-digit safety code displayed for out-of-band compare, and pins verified peers in
+  a persistent store (DataStore / UserDefaults JSON). Same-id-different-key imports are
+  refused through the shared `Pairing.verifyOutcome` rule (mirrored literal tests), and a
+  pin whose key disagrees with the live peer table is banner-flagged on screen.
+- Verified-key bookkeeping: the verified-peer store (above) is the pin, and the Pair
+  screen flags any pin whose key disagrees with the key currently in the peer table.
+  *Scope note:* under v1's
   8-byte ids an ANNOUNCE for an existing id carries a new key only on a ~2^64
   SHA-256 prefix collision (the router already requires
   `id == SHA-256(key)[0:8]`), so this is defence-in-depth today and becomes

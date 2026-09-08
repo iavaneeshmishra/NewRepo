@@ -81,6 +81,28 @@ object Pairing {
         return digits.chunked(4).joinToString(" ")
     }
 
+    /**
+     * The outcome of pinning an imported peer key against the verified-peer store.
+     * One id may pin exactly one key; re-pinning the same key is a refresh, while the
+     * same id arriving with a *different* key is always a [CONFLICT] that must be
+     * refused loudly and never silently overwrite the stored pin (docs/PAIRING.md §5).
+     */
+    enum class VerifyOutcome { VERIFIED, ALREADY_VERIFIED, CONFLICT }
+
+    /**
+     * The shared pinning rule (Android and iOS UIs must not diverge from it). Hex keys
+     * are compared case-insensitively; canonical form is lowercase.
+     */
+    fun verifyOutcome(existingPublicKeyWireHex: String?, importedPublicKeyWireHex: String): VerifyOutcome {
+        val incoming = importedPublicKeyWireHex.lowercase(Locale.ROOT)
+        val pinned = existingPublicKeyWireHex?.lowercase(Locale.ROOT)
+        return when {
+            pinned == null -> VerifyOutcome.VERIFIED
+            pinned == incoming -> VerifyOutcome.ALREADY_VERIFIED
+            else -> VerifyOutcome.CONFLICT
+        }
+    }
+
     /** Unsigned lexicographic byte order (must match Data comparison on iOS). */
     fun compareUnsigned(a: ByteArray, b: ByteArray): Int {
         val n = minOf(a.size, b.size)

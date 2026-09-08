@@ -90,6 +90,20 @@ enum Pairing {
         return groups.joined(separator: " ")
     }
 
+    /// The outcome of pinning an imported peer key against the verified-peer store.
+    /// One id may pin exactly one key; re-pinning the same key is a refresh, while the
+    /// same id arriving with a *different* key is always a `conflict` that must be
+    /// refused loudly and never silently overwrite the stored pin (docs/PAIRING.md §5).
+    enum VerifyOutcome { case verified, alreadyVerified, conflict }
+
+    /// The shared pinning rule (iOS and Android UIs must not diverge from it). Hex keys
+    /// are compared case-insensitively; canonical form is lowercase.
+    static func verifyOutcome(existingPublicKeyWireHex: String?, importedPublicKeyWireHex: String) -> VerifyOutcome {
+        let incoming = importedPublicKeyWireHex.lowercased()
+        guard let pinned = existingPublicKeyWireHex?.lowercased() else { return .verified }
+        return pinned == incoming ? .alreadyVerified : .conflict
+    }
+
     /// RFC 3986 unreserved bytes pass through; everything else becomes %XX (uppercase hex).
     static func percentEncode(_ value: String) -> String {
         var out = ""

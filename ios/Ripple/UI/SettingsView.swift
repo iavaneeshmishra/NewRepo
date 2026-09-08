@@ -32,6 +32,9 @@ struct SettingsView: View {
                     NavigationLink { PowerView() } label: {
                         Label("Power profile", systemImage: "battery.75")
                     }
+                    NavigationLink { PairView() } label: {
+                        Label("Pair & verify", systemImage: "person.crop.circle.badge.checkmark")
+                    }
                     NavigationLink { DiagnosticsView() } label: {
                         Label("Diagnostics", systemImage: "waveform.path.ecg")
                     }

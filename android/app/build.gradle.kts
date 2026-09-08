@@ -59,6 +59,10 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // QR *rendering* for pairing / backup codes (no camera anywhere): ZXing core is
+    // pure Java, mavenCentral-published, and pulls nothing else.
+    implementation("com.google.zxing:core:3.5.3")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")

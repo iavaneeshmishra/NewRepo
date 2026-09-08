@@ -42,6 +42,7 @@ import app.ripple.mesh.ui.screens.ChatScreen
 import app.ripple.mesh.ui.screens.DiagnosticsScreen
 import app.ripple.mesh.ui.screens.FieldTestScreen
 import app.ripple.mesh.ui.screens.HomeScreen
+import app.ripple.mesh.ui.screens.PairScreen
 import app.ripple.mesh.ui.screens.PowerScreen
 import app.ripple.mesh.ui.screens.SettingsScreen
 import app.ripple.mesh.ui.screens.SosScreen
@@ -103,8 +104,10 @@ fun RippleRoot(vm: MeshViewModel, fieldTestVm: FieldTestViewModel, launchIntent:
                 onOpenPower = { nav.navigate("power") },
                 onOpenDiagnostics = { nav.navigate("diagnostics") },
                 onOpenFieldTest = { nav.navigate("fieldtest") },
+                onOpenPair = { nav.navigate("pair") },
             )
         }
+        composable("pair") { PairScreen(vm, onBack = { nav.popBackStack() }) }
         composable("sos") { SosScreen(vm, onBack = { nav.popBackStack() }) }
         composable("power") { PowerScreen(vm, onBack = { nav.popBackStack() }) }
         composable("diagnostics") { DiagnosticsScreen(vm, onBack = { nav.popBackStack() }) }
