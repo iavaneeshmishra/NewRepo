@@ -73,8 +73,12 @@ so the platforms cannot drift apart.
 
 ## Security
 
-* Identity is a P-256 key generated on first launch and never exported
-  (Android Keystore on API 31+, Keychain `AfterFirstUnlockThisDeviceOnly` on iOS).
+* Identity is a P-256 key generated on first launch and never leaves the device
+  *unasked*: at rest it is Keystore-wrapped (Android: the private scalar is stored
+  encrypted under a non-exportable Keystore AES key; legacy pre-0.3 installs keep
+  the hardware-held key and cannot export) or Keychain-held
+  (`AfterFirstUnlockThisDeviceOnly` on iOS). The user can opt into an *encrypted*
+  export for backup — passphrase → PBKDF2 → AES-GCM; see `docs/BACKUP.md`.
 * Every packet is **ECDSA-signed** by its originator; relays cannot alter content
   (only `ttl` is outside the signature).
 * Direct messages are **ECIES** (ephemeral ECDH → HKDF-SHA256 → AES-256-GCM) with

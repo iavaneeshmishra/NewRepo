@@ -38,6 +38,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.ripple.mesh.R
+import app.ripple.mesh.ui.screens.BackupScreen
 import app.ripple.mesh.ui.screens.ChatScreen
 import app.ripple.mesh.ui.screens.DiagnosticsScreen
 import app.ripple.mesh.ui.screens.FieldTestScreen
@@ -105,9 +106,11 @@ fun RippleRoot(vm: MeshViewModel, fieldTestVm: FieldTestViewModel, launchIntent:
                 onOpenDiagnostics = { nav.navigate("diagnostics") },
                 onOpenFieldTest = { nav.navigate("fieldtest") },
                 onOpenPair = { nav.navigate("pair") },
+                onOpenBackup = { nav.navigate("backup") },
             )
         }
         composable("pair") { PairScreen(vm, onBack = { nav.popBackStack() }) }
+        composable("backup") { BackupScreen(vm, onBack = { nav.popBackStack() }) }
         composable("sos") { SosScreen(vm, onBack = { nav.popBackStack() }) }
         composable("power") { PowerScreen(vm, onBack = { nav.popBackStack() }) }
         composable("diagnostics") { DiagnosticsScreen(vm, onBack = { nav.popBackStack() }) }

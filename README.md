@@ -18,8 +18,9 @@ No servers. No accounts. No SIM. The Android app doesn't even request the
 - **Signed everything** — every packet is ECDSA-signed by its originator; forged or tampered packets are dropped.
 - **Delivery receipts** — direct messages get an ACK routed back through the mesh (✓ sent → ✓✓ delivered).
 - **Background operation** — Android foreground service; iOS Bluetooth background modes with state restoration.
-- **Hardware-backed identity** — Android Keystore / iOS Keychain; your node ID is derived from your public key.
+- **Hardware-protected identity** — the P-256 key is kept in the Android Keystore (as a Keystore-wrapped secret) or the iOS Keychain; your node ID is derived from your public key, and user-initiated backup exports it only in passphrase-encrypted form.
 - **Out-of-band pairing** — Settings → *Pair & verify* shows your full public key as a QR identity code (render-only — no camera permission), imports a peer's code by paste, and pins verified peers; both phones compare a 12-digit safety number so verification isn't limited by the 8-byte node id (see [`docs/PAIRING.md`](docs/PAIRING.md)).
+- **Identity backup & restore** — Settings → *Backup & restore* exports your identity as a passphrase-encrypted blob (PBKDF2 → AES-GCM) carried by QR or plain text; restoring on a fresh install re-derives the same node id and key, so old messages stay readable and peers keep verifying you. A leaked passphrase = a lost identity — see [`docs/BACKUP.md`](docs/BACKUP.md).
 - **One protocol, three implementations** — Kotlin, Swift, and a Node reference that generates shared test vectors both apps must pass.
 - **Works with one phone** — a built-in *simulated neighbourhood* (two fake peers, one of them two hops away and intermittently out of range) lets you try everything without a second device.
 - **Diagnostics built in** — link states, RSSI, throughput, a rolling event log and one-tap export for bug reports.

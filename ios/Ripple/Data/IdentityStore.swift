@@ -31,6 +31,25 @@ enum IdentityStore {
         set { UserDefaults.standard.set(newValue, forKey: powerProfileKey) }
     }
 
+    /// Backup & restore (Phase 0.3, docs/BACKUP.md): the identity is exportable by
+    /// design — CryptoKit hands back the raw scalar that already lives in the Keychain.
+    static func exportMaterial() -> (scalar: Data, wire: Data) {
+        let id = load()
+        return (id.signing.rawRepresentation, id.publicKeyWire)
+    }
+
+    /// Installs a restored identity after checking it is self-consistent (the scalar's
+    /// public key must equal the public key embedded in the payload). Returns false when
+    /// the payload is inconsistent; on success the app must restart to activate (docs/BACKUP.md §3).
+    @discardableResult
+    static func prepareRestore(scalar: Data, wire: Data) -> Bool {
+        guard scalar.count == 32, wire.count == 65, let id = try? Identity(rawScalar: scalar), id.publicKeyWire == wire else { return false }
+        writeKeychain(id.signing.rawRepresentation)
+        // Log at most the 4-hex suffix — full ids are never logged.
+        EventLog.global.i("identity", "identity restored from backup (node \(id.nodeId.short)); restart to activate")
+        return true
+    }
+
     private static func query() -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
     }

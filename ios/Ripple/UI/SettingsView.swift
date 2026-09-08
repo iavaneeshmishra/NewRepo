@@ -35,6 +35,9 @@ struct SettingsView: View {
                     NavigationLink { PairView() } label: {
                         Label("Pair & verify", systemImage: "person.crop.circle.badge.checkmark")
                     }
+                    NavigationLink { BackupView() } label: {
+                        Label("Backup & restore", systemImage: "archivebox")
+                    }
                     NavigationLink { DiagnosticsView() } label: {
                         Label("Diagnostics", systemImage: "waveform.path.ecg")
                     }
