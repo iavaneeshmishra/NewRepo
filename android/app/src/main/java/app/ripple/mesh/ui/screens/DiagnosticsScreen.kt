@@ -70,7 +70,7 @@ fun DiagnosticsScreen(vm: MeshViewModel, onBack: () -> Unit) {
 
     Scaffold(topBar = {
         TopAppBar(
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) } },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
             title = { Text(stringResource(R.string.diagnostics)) },
             actions = {
                 IconButton(onClick = { EventLog.global.clear() }) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.clear_log)) }

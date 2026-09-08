@@ -119,8 +119,13 @@ class MeshService : LifecycleService(), RouterListener {
     /** Most recently received SOS beacon (drives the SOS screen + notification). */
     @Volatile var recentSos: SosBeacon? = null
 
-    /** Conversation currently on screen; used to suppress its notifications. */
-    @Volatile var visibleConversation: String? = null
+    /** Conversation currently on screen; suppresses and clears its notifications. */
+    @Volatile
+    var visibleConversation: String? = null
+        set(value) {
+            field = value
+            value?.let { getSystemService(NotificationManager::class.java).cancel(it.hashCode()) }
+        }
 
     override fun onBind(intent: Intent): IBinder { super.onBind(intent); return binder }
 
@@ -253,9 +258,10 @@ class MeshService : LifecycleService(), RouterListener {
         lifecycleScope.launch(Dispatchers.IO) { db.sos().upsert(entity) }
         val title = "SOS — ${beacon.fromName ?: beacon.from.display}"
         val body = if (beacon.text.isEmpty()) "An SOS beacon is active nearby." else beacon.text
+        val intent = Intent(this, MainActivity::class.java).putExtra("route", "sos")
         val n = NotificationCompat.Builder(this, CHANNEL_MESSAGES)
             .setSmallIcon(R.drawable.ic_stat_ripple).setContentTitle(title).setContentText(body)
-            .setAutoCancel(true).setContentIntent(PendingIntent.getActivity(this, "sos".hashCode(), Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+            .setAutoCancel(true).setContentIntent(PendingIntent.getActivity(this, "sos".hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .build()
         getSystemService(NotificationManager::class.java).notify("sos".hashCode(), n)
     }
@@ -377,12 +383,14 @@ class MeshService : LifecycleService(), RouterListener {
 
     private fun updateNotification() { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildStatusNotification()) }
 
-    private fun notifyMessage(m: MessageEntity) {
-        val intent = Intent(this, MainActivity::class.java).putExtra("conversation", m.conversation)
+    private suspend fun notifyMessage(m: MessageEntity) {
+        val intent = Intent(this, MainActivity::class.java).putExtra("route", "chat/${m.conversation}")
         val pi = PendingIntent.getActivity(this, m.conversation.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = m.fromName ?: NodeId.fromHex(m.fromNodeId).display
+        val unread = db.messages().countUnread()
         val n = NotificationCompat.Builder(this, CHANNEL_MESSAGES)
             .setSmallIcon(R.drawable.ic_stat_ripple).setContentTitle(title).setContentText(m.text)
+            .setNumber(unread)
             .setAutoCancel(true).setContentIntent(pi).build()
         getSystemService(NotificationManager::class.java).notify(m.conversation.hashCode(), n)
     }

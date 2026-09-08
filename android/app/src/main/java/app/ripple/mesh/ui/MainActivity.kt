@@ -51,13 +51,19 @@ import app.ripple.mesh.ui.screens.SosScreen
 class MainActivity : ComponentActivity() {
     private val vm: MeshViewModel by viewModels()
     private val fieldTestVm: FieldTestViewModel by viewModels()
+    private var launchIntent by mutableStateOf<Intent?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { RippleTheme { RippleRoot(vm, fieldTestVm, intent) } }
+        launchIntent = intent
+        setContent { RippleTheme { RippleRoot(vm, fieldTestVm, launchIntent) } }
     }
 
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent) }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchIntent = intent
+    }
 }
 
 fun requiredPermissions(): Array<String> = if (Build.VERSION.SDK_INT >= 31) {
@@ -87,7 +93,9 @@ fun RippleRoot(vm: MeshViewModel, fieldTestVm: FieldTestViewModel, launchIntent:
 
     val nav = rememberNavController()
     LaunchedEffect(launchIntent) {
-        launchIntent?.getStringExtra("conversation")?.let { nav.navigate("chat/$it") }
+        val route = launchIntent?.getStringExtra("route")
+            ?: launchIntent?.getStringExtra("conversation")?.let { "chat/$it" }
+        route?.let { nav.navigate(it) }
     }
 
     NavHost(navController = nav, startDestination = "home") {

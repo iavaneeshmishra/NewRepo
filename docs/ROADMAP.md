@@ -120,9 +120,15 @@ later phase is validated against reality instead of simulation.
   commit using only the docs in this repo.
 
 ### 0.5 Small app-layer polish  · ●○○ · app-only
-- i18n scaffolding (Android already uses resources; Swift needs the same pass).
-- Notification deep-links straight into the right chat; badge count for unread.
-- Screen reader labels pass on chat/peers/diagnostics screens.
+- **Landed:** i18n scaffolding — Android resources plus deterministic iOS
+  literal-as-key extraction and translation guidance in `docs/I18N.md`.
+- **Landed:** notification deep-links straight into the right chat (and Android
+  SOS screen), per-conversation notification clearing, and unread badge counts.
+- **Landed in code:** screen-reader labels and merged message/badge semantics on
+  chat, peers, diagnostics, pairing/backup, and field-test screens. The physical
+  TalkBack/VoiceOver acceptance run remains pending.
+- **Scope decision:** QR codes remain render-only. In-app camera scanning is out
+  of scope; use any QR scanner and paste the decoded identity or backup code.
 
 **Phase 0 exit criteria:** Phase 0.1–0.3 in the hands of at least three
 two-phone testers; Field test issues filed with the new structured export; 0.4

@@ -46,8 +46,19 @@ final class MeshService: ObservableObject, RouterListener {
     private var loopback: Loopback?
     let eventLog = EventLog.global
 
-    /// Conversation currently on screen; suppresses its notifications.
-    var visibleConversation: String?
+    /// Conversation currently on screen; suppresses and clears its notifications.
+    var visibleConversation: String? {
+        didSet {
+            guard let conversation = visibleConversation else { return }
+            let center = UNUserNotificationCenter.current()
+            center.getDeliveredNotifications { notifications in
+                let identifiers = notifications
+                    .filter { $0.request.content.threadIdentifier == conversation }
+                    .map(\.request.identifier)
+                center.removeDeliveredNotifications(withIdentifiers: identifiers)
+            }
+        }
+    }
 
     init(container: ModelContainer) {
         self.container = container
@@ -159,6 +170,7 @@ final class MeshService: ObservableObject, RouterListener {
                                     status: .received, verified: m.verified)
             self.container.mainContext.insert(rec)
             try? self.container.mainContext.save()
+            self.refreshBadge()
             if self.visibleConversation != conversation { self.notify(rec) }
         }
     }
@@ -296,6 +308,16 @@ final class MeshService: ObservableObject, RouterListener {
         if let unread = try? ctx.fetch(FetchDescriptor<MessageRecord>(predicate: #Predicate { $0.conversation == conversation && $0.statusRaw == received && !$0.outgoing })) {
             unread.forEach { $0.status = .delivered }
             try? ctx.save()
+        }
+        refreshBadge()
+    }
+
+    private func refreshBadge() {
+        let received = MessageStatus.received.rawValue
+        let descriptor = FetchDescriptor<MessageRecord>(predicate: #Predicate { $0.statusRaw == received && !$0.outgoing })
+        let unread = (try? container.mainContext.fetch(descriptor).count) ?? 0
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(unread) { _ in }
         }
     }
 

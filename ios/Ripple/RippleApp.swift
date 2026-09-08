@@ -24,7 +24,15 @@ struct RippleApp: App {
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    static var openConversation: ((String) -> Void)?
+    /// Notification taps can arrive before HomeView installs its navigation handler.
+    static var pendingConversation: String?
+    static var openConversation: ((String) -> Void)? {
+        didSet {
+            guard let handler = openConversation, let pending = pendingConversation else { return }
+            pendingConversation = nil
+            handler(pending)
+        }
+    }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
@@ -32,8 +40,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        if let c = response.notification.request.content.userInfo["conversation"] as? String {
-            await MainActor.run { Self.openConversation?(c) }
+        if let conversation = response.notification.request.content.userInfo["conversation"] as? String {
+            await MainActor.run {
+                if let handler = Self.openConversation {
+                    handler(conversation)
+                } else {
+                    Self.pendingConversation = conversation
+                }
+            }
         }
     }
 

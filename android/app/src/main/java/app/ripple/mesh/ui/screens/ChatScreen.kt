@@ -37,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.ripple.mesh.R
@@ -67,7 +69,7 @@ fun ChatScreen(vm: MeshViewModel, conversation: String, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
                 title = {
                     Column {
                         Text(if (isBroadcast) stringResource(R.string.broadcast_channel) else peer?.name ?: NodeId.fromHex(conversation).display)
@@ -105,10 +107,24 @@ fun ChatScreen(vm: MeshViewModel, conversation: String, onBack: () -> Unit) {
 private fun MessageBubble(m: MessageEntity, showSender: Boolean) {
     val mine = m.outgoing
     val bg = if (mine) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val sender = if (showSender && !mine) m.fromName ?: NodeId.fromHex(m.fromNodeId).display else null
+    val time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(m.timestamp))
+    val statusWord = if (mine) when (m.status) {
+        MessageStatus.PENDING -> stringResource(R.string.status_pending_short)
+        MessageStatus.SENT -> stringResource(R.string.status_sent)
+        MessageStatus.DELIVERED -> stringResource(R.string.status_delivered)
+        MessageStatus.FAILED -> stringResource(R.string.status_failed)
+        MessageStatus.RECEIVED -> null
+    } else null
+    val verification = if (!mine && !m.verified) stringResource(R.string.unverified) else null
+    // Compute localized strings before entering the non-composable semantics lambda.
+    val summary = listOfNotNull(sender, m.text, time, statusWord, verification).joinToString(", ")
+
     Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         Column(
             Modifier.widthIn(max = 300.dp)
                 .background(bg, RoundedCornerShape(16.dp, 16.dp, if (mine) 4.dp else 16.dp, if (mine) 16.dp else 4.dp))
+                .clearAndSetSemantics { contentDescription = summary }
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             if (showSender && !mine) {

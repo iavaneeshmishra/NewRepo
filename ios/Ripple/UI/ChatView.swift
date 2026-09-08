@@ -42,6 +42,7 @@ struct ChatView: View {
                     guard !t.isEmpty else { return }
                     mesh.send(conversation: conversation, text: t); draft = ""
                 } label: { Image(systemName: "paperplane.fill").font(.title3) }
+                .accessibilityLabel("Send")
                 .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(8)
@@ -83,6 +84,7 @@ private struct MessageBubble: View {
                     Text(message.timestamp, style: .time).font(.caption2).foregroundStyle(.secondary)
                     if mine {
                         Text(statusGlyph).font(.caption2).foregroundStyle(message.status == .failed ? .red : .secondary)
+                            .accessibilityLabel(statusWord)
                     } else if !message.verified {
                         Text("unverified").font(.caption2).foregroundStyle(.red)
                     }
@@ -92,6 +94,17 @@ private struct MessageBubble: View {
             .background(mine ? Color.accentColor.opacity(0.25) : Color(.secondarySystemBackground),
                         in: UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: mine ? 16 : 4, bottomTrailingRadius: mine ? 4 : 16, topTrailingRadius: 16))
             if !mine { Spacer(minLength: 60) }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusWord: String {
+        switch message.status {
+        case .pending: return "Pending"
+        case .sent: return "Sent"
+        case .delivered: return "Delivered"
+        case .failed: return "Failed"
+        case .received: return "Received"
         }
     }
 

@@ -62,7 +62,9 @@ struct DiagnosticsView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { EventLog.global.clear(); events = [] } label: { Image(systemName: "trash") }
+                    .accessibilityLabel("Clear log")
                 Button { shareText = EventLog.global.export(header: mesh.diagnosticsHeader()) } label: { Image(systemName: "square.and.arrow.up") }
+                    .accessibilityLabel("Share diagnostics")
             }
         }
         .onReceive(tick) { _ in refresh() }

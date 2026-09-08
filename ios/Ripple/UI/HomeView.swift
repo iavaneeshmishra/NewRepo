@@ -45,6 +45,7 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showSettings = true } label: { Image(systemName: "gearshape") }
+                        .accessibilityLabel("Settings")
                 }
             }
             .navigationDestination(for: String.self) { ChatView(conversation: $0) }
@@ -105,6 +106,7 @@ struct HomeView: View {
                 }
             } else {
                 List(peers) { p in
+                    let online = Date().timeIntervalSince(p.lastSeen) < 300
                     NavigationLink(value: p.nodeId) {
                         HStack(spacing: 12) {
                             AvatarView(nodeIdHex: p.nodeId)
@@ -116,7 +118,8 @@ struct HomeView: View {
                                 }.foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Circle().fill(Date().timeIntervalSince(p.lastSeen) < 300 ? Color.green : Color.gray.opacity(0.4)).frame(width: 10, height: 10)
+                            Circle().fill(online ? Color.green : Color.gray.opacity(0.4)).frame(width: 10, height: 10)
+                                .accessibilityLabel(online ? "Online" : "Offline")
                         }
                     }
                 }
@@ -131,6 +134,7 @@ struct UnreadBadge: View {
     var body: some View {
         Text("\(count)").font(.caption2.bold()).foregroundStyle(.white)
             .padding(.horizontal, 7).padding(.vertical, 3).background(Color.accentColor, in: Capsule())
+            .accessibilityLabel("\(count) unread message\(count == 1 ? "" : "s")")
     }
 }
 

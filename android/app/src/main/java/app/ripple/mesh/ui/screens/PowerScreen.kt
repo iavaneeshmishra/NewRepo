@@ -25,7 +25,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.ripple.mesh.R
 import app.ripple.mesh.core.BatteryProfile
 import app.ripple.mesh.ui.MeshViewModel
 
@@ -44,8 +46,8 @@ fun PowerScreen(vm: MeshViewModel, onBack: () -> Unit) {
 
     Scaffold(topBar = {
         TopAppBar(
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) } },
-            title = { Text("Power profile") },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
+            title = { Text(stringResource(R.string.power_screen)) },
         )
     }) { padding ->
         Column(

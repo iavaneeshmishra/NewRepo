@@ -53,7 +53,7 @@ fun SettingsScreen(
 
     Scaffold(topBar = {
         TopAppBar(
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) } },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
             title = { Text(stringResource(R.string.settings)) },
         )
     }) { padding ->
@@ -75,8 +75,8 @@ fun SettingsScreen(
             HorizontalDivider()
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onOpenSos, modifier = Modifier.weight(1f)) { Text("SOS beacon") }
-                Button(onClick = onOpenPower, modifier = Modifier.weight(1f)) { Text("Power profile") }
+                Button(onClick = onOpenSos, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.sos_screen)) }
+                Button(onClick = onOpenPower, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.power_screen)) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = onOpenDiagnostics, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.diagnostics)) }

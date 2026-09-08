@@ -98,7 +98,7 @@ fun BackupScreen(vm: MeshViewModel, onBack: () -> Unit) {
 
     Scaffold(topBar = {
         TopAppBar(
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) } },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) } },
             title = { Text(stringResource(R.string.backup_title)) },
         )
     }) { padding ->
