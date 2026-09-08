@@ -1,0 +1,1 @@
+Initial internet-free BLE mesh release: encrypted direct chat, public broadcasts, delivery receipts, SOS, pairing and identity backup, field-test mode, diagnostics, notification deep-links, accessibility, and localization scaffolding.

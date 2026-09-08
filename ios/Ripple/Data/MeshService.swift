@@ -44,6 +44,7 @@ final class MeshService: ObservableObject, RouterListener {
     private var peripheral: BlePeripheral!
     private var housekeeping: Timer?
     private var loopback: Loopback?
+    private let previousCrash: String?
     let eventLog = EventLog.global
 
     /// Conversation currently on screen; suppresses and clears its notifications.
@@ -61,6 +62,7 @@ final class MeshService: ObservableObject, RouterListener {
     }
 
     init(container: ModelContainer) {
+        self.previousCrash = CrashLog.takePending()
         self.container = container
         let identity = IdentityStore.load()
         let name = IdentityStore.displayName ?? "Ripple \(identity.nodeId.short)"
@@ -257,6 +259,7 @@ final class MeshService: ObservableObject, RouterListener {
         s += "device: \(UIDevice.current.model)  iOS \(UIDevice.current.systemVersion)\n"
         s += "bluetooth: \(status.bluetoothOn ? "on" : "off")  advertising: \(peripheral.isAdvertising)  loopback: \(loopback?.isRunning ?? false)\n"
         s += "links: \(router.linkCount())  identified: \(router.directNeighbourCount())  peers known: \(router.allPeers().count)  relay store: \(router.relayStoreSnapshot().count)\n"
+        if let previousCrash { s += "previous crash: \(previousCrash)\n" }
         for l in linkInfos() { s += "  \(l.id) [\(l.role)] peer=\(l.peerName ?? l.peerShort ?? "?") rssi=\(l.rssi.map(String.init) ?? "?") frame=\(l.frameSize) in=\(l.packetsIn)p/\(l.bytesIn)B out=\(l.packetsOut)p/\(l.bytesOut)B\n" }
         for p in router.allPeers() { s += "  peer \(p.name) (\(p.nodeId.short)) hops=\(p.hops) seen=\(EventLog.formatTime(p.lastSeen))\n" }
         return s

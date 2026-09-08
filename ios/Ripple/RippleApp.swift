@@ -2,6 +2,38 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 
+/// Minimal Objective-C exception handoff for the next Diagnostics export.
+/// It never reads messages or identity material; values are bounded and long
+/// hex/base64-like tokens are redacted before touching UserDefaults.
+enum CrashLog {
+    private static let pendingKey = "ripple.pendingException"
+
+    static func install() {
+        NSSetUncaughtExceptionHandler(rippleUncaughtException)
+    }
+
+    static func takePending() -> String? {
+        let defaults = UserDefaults.standard
+        let value = defaults.string(forKey: pendingKey)
+        defaults.removeObject(forKey: pendingKey)
+        return value
+    }
+
+    fileprivate static func record(_ exception: NSException) {
+        let name = String(exception.name.rawValue.prefix(128))
+        let rawReason = exception.reason ?? "reason unavailable"
+        let oneLine = rawReason.replacingOccurrences(of: "[\\r\\n\\t]+", with: " ", options: .regularExpression)
+        let withoutHex = oneLine.replacingOccurrences(of: "(?i)\\b[0-9a-f]{16,}\\b", with: "<redacted>", options: .regularExpression)
+        let sanitized = withoutHex.replacingOccurrences(of: "\\b[A-Za-z0-9+/_-]{32,}={0,2}\\b", with: "<redacted>", options: .regularExpression)
+        UserDefaults.standard.set("name=\(name); reason=\(sanitized.prefix(512))", forKey: pendingKey)
+        UserDefaults.standard.synchronize()
+    }
+}
+
+private func rippleUncaughtException(_ exception: NSException) {
+    CrashLog.record(exception)
+}
+
 @main
 struct RippleApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -35,6 +67,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        CrashLog.install()
         UNUserNotificationCenter.current().delegate = self
         return true
     }

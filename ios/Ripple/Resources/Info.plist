@@ -18,6 +18,9 @@
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<!-- Conservative export-compliance declaration: Ripple encrypts message content. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<true/>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
