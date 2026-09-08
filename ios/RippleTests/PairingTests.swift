@@ -81,4 +81,17 @@ final class PairingTests: XCTestCase {
             Pairing.safetyCode(publicKeyWireA: keyA, publicKeyWireB: keyB)
         )
     }
+
+    func testVerifyOutcomePinsNewKeysToleratesRepinsAndRefusesKeySwaps() {
+        let aHex = "04" + String(repeating: "11", count: 64)
+        let bHex = "04" + String(repeating: "22", count: 64)
+        // First-time pin for an id.
+        XCTAssertEqual(.verified, Pairing.verifyOutcome(existingPublicKeyWireHex: nil, importedPublicKeyWireHex: aHex))
+        // Re-pinning the same key (either case) is a refresh, not a conflict.
+        XCTAssertEqual(.alreadyVerified, Pairing.verifyOutcome(existingPublicKeyWireHex: aHex, importedPublicKeyWireHex: aHex))
+        XCTAssertEqual(.alreadyVerified, Pairing.verifyOutcome(existingPublicKeyWireHex: aHex.uppercased(), importedPublicKeyWireHex: aHex))
+        // Same id, different key — always refused; the UI must never overwrite the pin.
+        XCTAssertEqual(.conflict, Pairing.verifyOutcome(existingPublicKeyWireHex: aHex, importedPublicKeyWireHex: bHex))
+        XCTAssertEqual(.conflict, Pairing.verifyOutcome(existingPublicKeyWireHex: aHex.uppercased(), importedPublicKeyWireHex: bHex))
+    }
 }

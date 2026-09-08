@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.ripple.mesh.core.BatteryProfile
 import app.ripple.mesh.core.NodeId
+import app.ripple.mesh.core.toHex
 import app.ripple.mesh.data.ConversationSummary
 import app.ripple.mesh.data.IdentityStore
 import app.ripple.mesh.data.MessageEntity
@@ -41,6 +42,13 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BatteryProfile.BALANCED)
 
     val selfId: StateFlow<NodeId?> = service.flatMapLatest { flowOf(it?.router?.selfId) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * Hex of our own 65-byte P-256 public key wire form, once the service is bound.
+     * Input for pairing codes/safety numbers (docs/PAIRING.md) — never log it.
+     */
+    val selfPublicKeyHex: StateFlow<String?> = service.flatMapLatest { flowOf(it?.router?.identity?.publicKeyWire?.toHex()) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val displayName: StateFlow<String?> = IdentityStore.displayName(app)

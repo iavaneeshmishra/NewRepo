@@ -78,4 +78,17 @@ class PairingTest {
         val keyC: ByteArray = ("04" + "33".repeat(64)).hexToBytes()
         assertTrue(Pairing.safetyCode(keyA, keyC) != Pairing.safetyCode(keyA, keyB))
     }
+
+    @Test fun `verifyOutcome pins new keys tolerates re-pins and refuses key swaps`() {
+        val aHex = "04" + "11".repeat(64)
+        val bHex = "04" + "22".repeat(64)
+        // First-time pin for an id.
+        assertEquals(Pairing.VerifyOutcome.VERIFIED, Pairing.verifyOutcome(null, aHex))
+        // Re-pinning the same key (either case) is a refresh, not a conflict.
+        assertEquals(Pairing.VerifyOutcome.ALREADY_VERIFIED, Pairing.verifyOutcome(aHex, aHex))
+        assertEquals(Pairing.VerifyOutcome.ALREADY_VERIFIED, Pairing.verifyOutcome(aHex.uppercase(), aHex))
+        // Same id, different key — always refused; the UI must never overwrite the pin.
+        assertEquals(Pairing.VerifyOutcome.CONFLICT, Pairing.verifyOutcome(aHex, bHex))
+        assertEquals(Pairing.VerifyOutcome.CONFLICT, Pairing.verifyOutcome(aHex.uppercase(), bHex))
+    }
 }

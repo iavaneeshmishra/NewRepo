@@ -63,4 +63,32 @@
     <string name="ft_reset">Reset session</string>
     <string name="ft_reset_confirm">Clear all verdicts and notes for this field-test run? The report has not been shared yet.</string>
     <string name="cancel">Cancel</string>
+
+    <string name="pair_verify">Pair &amp; verify</string>
+    <string name="pair_subtitle">QR identity code, paste-import, pinned verified keys</string>
+    <string name="pair_wait_identity">Starting the mesh service… the identity code appears here in a moment.</string>
+    <string name="pair_qr_desc">QR code of your Ripple identity code</string>
+    <string name="pair_own_hint">Scan this with any QR app (or copy/share the text) and hand the code to your contact over a channel you already trust. Ripple never uses the camera.</string>
+    <string name="pair_import_title">Add a peer</string>
+    <string name="pair_import_hint">Paste the RIPPLE-ID:v1 code you received from them. The code is fully validated before anything is stored.</string>
+    <string name="pair_import_field">Identity code (RIPPLE-ID:v1:…)</string>
+    <string name="pair_import">Import</string>
+    <string name="pair_import_bad">Not a valid Ripple identity code — check the prefix, lengths and hex, and paste it complete.</string>
+    <string name="pair_unnamed">Peer %1$s</string>
+    <string name="pair_key_prefix">Key %1$s…%2$s</string>
+    <string name="pair_safety_label">Safety code — read these digits to each other over any channel:</string>
+    <string name="pair_safety_hint">Equal digits on both phones mean you hold each other\'s real keys, not an impostor\'s.</string>
+    <string name="pair_own_code">That is your own identity code.</string>
+    <string name="pair_mesh_key_mismatch">Key conflict: the mesh already knows a different key for this node id. Do NOT trust either until you resolve it in person — the pinned key is kept.</string>
+    <string name="pair_pin">Pin as verified</string>
+    <string name="pair_pinned">Pinned — this peer is now verified on this device.</string>
+    <string name="pair_repinned">Already pinned with the same key; record refreshed.</string>
+    <string name="pair_conflict">Refused: this node id is pinned to a different key. Your old pin was kept — talk to your contact before trusting either key.</string>
+    <string name="pair_verified_title">Verified peers</string>
+    <string name="pair_verified_empty">No pinned peers yet. Import a peer\'s identity code above and pin it after comparing safety codes.</string>
+    <string name="pair_unpin">Remove pin</string>
+    <string name="pair_footer">Pins live only in this app\'s private storage, alongside nothing secret (public keys) — but they are never logged. Un-pin only when your contact tells you their identity changed.</string>
+    <string name="copy">Copy</string>
+    <string name="share">Share</string>
+    <string name="pair_share">Share identity code</string>
 </resources>
