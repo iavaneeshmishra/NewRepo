@@ -193,7 +193,7 @@ struct PairView: View {
 }
 
 /// UIActivityViewController wrapper for the share sheet (same pattern as Diagnostics).
-private struct ActivityView: UIViewControllerRepresentable {
+struct ActivityView: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: items, applicationActivities: nil)

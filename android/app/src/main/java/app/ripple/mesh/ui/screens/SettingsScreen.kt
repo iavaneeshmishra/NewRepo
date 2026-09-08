@@ -43,6 +43,7 @@ fun SettingsScreen(
     onOpenDiagnostics: () -> Unit = {},
     onOpenFieldTest: () -> Unit = {},
     onOpenPair: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
 ) {
     val selfId by vm.selfId.collectAsStateWithLifecycle()
     val savedName by vm.displayName.collectAsStateWithLifecycle()
@@ -84,6 +85,8 @@ fun SettingsScreen(
             Text(stringResource(R.string.field_test_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedButton(onClick = onOpenPair, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_verify)) }
             Text(stringResource(R.string.pair_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.backup_title)) }
+            Text(stringResource(R.string.backup_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.about_blurb), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

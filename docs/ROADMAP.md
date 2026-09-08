@@ -96,14 +96,18 @@ later phase is validated against reality instead of simulation.
   changes (2.2) raises an unmissable alert.
 
 ### 0.3 Identity backup & restore  · ●●○ · app-only
-- Export the identity key as an encrypted blob (passphrase → PBKDF2 → AES-GCM,
-  implemented per platform with Keystore/Keychain-backed wrapping) shown as a
-  QR payload and/or a text blob for offline transport.
-- Restore on a fresh install re-derives the same node ID and key.
-- Acceptance: backup on phone A, wipe/reinstall, restore, and A still decrypts
-  messages addressed to the old identity and signs packets other nodes verify.
-  Document explicitly that a leaked passphrase = lost identity (no revocation
-  until Phase 2).
+- **Landed (`docs/BACKUP.md`):** the identity key exports as a passphrase-encrypted
+  blob (PBKDF2-HMAC-SHA256 150k → AES-256-GCM, AAD-bound) shown as a QR payload and a
+  copy/share text blob for offline transport — `Backup` core on both platforms with
+  mirrored literal vectors; Settings → *Backup & restore* on both apps.
+- **Landed:** restore on a fresh install re-derives the same node ID and key. Android
+  moves to a backupable storage model (private scalar wrapped by a non-exportable
+  Keystore AES key); legacy Keystore-only installs stay functional but cannot export
+  (hardware, by design) and the UI says so plainly.
+- Documented loudly (`docs/BACKUP.md` §0 + on-screen): a leaked passphrase = lost
+  identity — no revocation until Phase 2.2.
+- Pending for exit: the acceptance run itself — backup on phone A, wipe/reinstall,
+  restore, A still decrypts old DMs and signs packets peers verify (field-test issue).
 
 ### 0.4 Release readiness  · ●●○ · app-only
 - Android: reproducible-ish debug/release builds from CI, Play internal track +

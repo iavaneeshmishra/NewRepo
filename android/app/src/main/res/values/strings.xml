@@ -91,4 +91,30 @@
     <string name="copy">Copy</string>
     <string name="share">Share</string>
     <string name="pair_share">Share identity code</string>
+
+    <string name="backup_title">Backup &amp; restore</string>
+    <string name="backup_subtitle">Encrypted identity blob so a reinstall keeps your node id</string>
+    <string name="backup_warning">Whoever holds this code AND the passphrase is your identity — there is no revocation until Phase 2.2. Store it offline; a leaked passphrase means a lost identity.</string>
+    <string name="backup_create_title">Create a backup</string>
+    <string name="backup_create_hint">The passphrase encrypts the export. It is never stored anywhere — a forgotten passphrase makes the backup permanently unreadable.</string>
+    <string name="backup_passphrase">Passphrase</string>
+    <string name="backup_passphrase_confirm">Repeat passphrase</string>
+    <string name="backup_create">Create backup code</string>
+    <string name="backup_create_failed">Could not create the blob — is the mesh service running?</string>
+    <string name="backup_legacy_keystore">This device still uses the legacy Keystore-only identity, whose key can never leave the hardware, so it cannot be exported. A restore on this device would move it onto the new backupable storage model.</string>
+    <string name="backup_qr_desc">QR code of your backup code</string>
+    <string name="backup_created_hint">Keep the code and the passphrase in separate places (e.g. paper + memory). The QR is only a convenience for a nearby device.</string>
+    <string name="backup_share">Share backup code</string>
+    <string name="backup_restore_title">Restore</string>
+    <string name="backup_restore_hint">Paste a RIPPLE-BKP:v1 code from any device of this identity. On a fresh install this rebuilds your exact node id and key.</string>
+    <string name="backup_restore_field">Backup code (RIPPLE-BKP:v1:…)</string>
+    <string name="backup_check">Check code</string>
+    <string name="backup_bad_passphrase">Wrong passphrase — or the code was tampered with. No plaintext was recovered either way.</string>
+    <string name="backup_bad_format">Not a valid Ripple backup code (check prefix, length and base64 body).</string>
+    <string name="backup_restores_to">Validates. Restores node %1$s.</string>
+    <string name="backup_replace_caution">Heads-up: this differs from the identity currently in use on this device. Peers\' safety codes for you refer to your key — after restoring the SAME identity they stay valid; after restoring a DIFFERENT one, you are someone else to the mesh.</string>
+    <string name="backup_install">Restore identity</string>
+    <string name="backup_restored">Restored. Restart Ripple to activate the identity.</string>
+    <string name="backup_restart_now">Restart now</string>
+    <string name="backup_footer">Restore re-derives the node id and key from the blob, so old messages stay decryptable and other nodes keep verifying your signatures. No wire changes — this never leaves the app. See docs/BACKUP.md.</string>
 </resources>

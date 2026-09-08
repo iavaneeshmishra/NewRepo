@@ -8,6 +8,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.ripple.mesh.core.Backup
 import app.ripple.mesh.core.BatteryProfile
 import app.ripple.mesh.core.NodeId
 import app.ripple.mesh.core.toHex
@@ -93,6 +94,27 @@ class MeshViewModel(app: Application) : AndroidViewModel(app) {
     fun setPowerProfile(code: Int) = viewModelScope.launch { service.value?.setPowerProfile(code) }
 
     fun sendSos(text: String, shareLocation: Boolean) = viewModelScope.launch { service.value?.sendSos(text, shareLocation) }
+
+    // ---- identity backup & restore (Phase 0.3; docs/BACKUP.md) -------------------------
+
+    /** False only for the legacy Keystore-only identity, whose key can never leave the hardware. */
+    fun identityExportable(): Boolean =
+        service.value?.router?.identity?.let { IdentityStore.isExportable(it) } ?: false
+
+    /** Encrypts this device's identity as a `RIPPLE-BKP:v1:` blob; null if not exportable/bound. */
+    fun createBackupBlob(passphrase: String): String? {
+        val identity = service.value?.router?.identity ?: return null
+        val scalar = IdentityStore.exportScalar(identity) ?: return null
+        return runCatching { Backup.createBlob(scalar, identity.publicKeyWire, passphrase) }.getOrNull()
+    }
+
+    /** @return null on success (restart to activate), or a human-readable refusal reason. */
+    fun restoreIdentity(payload: ByteArray): String? = try {
+        IdentityStore.installRestored(getApplication(), Backup.scalarOf(payload), Backup.publicKeyOf(payload))
+        null
+    } catch (e: Exception) {
+        e.message ?: "restore refused"
+    }
 
     // Diagnostics
     fun linkInfos(): List<LinkInfo> = service.value?.linkInfos() ?: emptyList()
